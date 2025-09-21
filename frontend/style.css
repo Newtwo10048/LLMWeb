@@ -1,0 +1,52 @@
+:root { --accent:#0b6efd; --muted:#666 }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC';
+  padding:18px; background:#f6f8fb;
+}
+.container {
+  max-width:1100px; margin:0 auto; background:white;
+  padding:18px; border-radius:10px;
+  box-shadow:0 6px 24px rgba(12,20,40,.06);
+}
+header { display:flex; align-items:center; gap:12px }
+header h1 { margin:0; font-size:20px }
+nav { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap }
+button.tab {
+  background:transparent; border:1px solid #e6e9ef;
+  padding:8px 12px; border-radius:8px; cursor:pointer;
+}
+button.tab.active { background:var(--accent); color:white; border-color:var(--accent) }
+.panel { margin-top:16px }
+.panel.locked { pointer-events:none; opacity:0.5 }
+form.grid { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px }
+input,select,textarea {
+  width:100%; padding:8px; border-radius:6px; border:1px solid #e6e9ef
+}
+.full { grid-column:1/-1 }
+.row { display:flex; gap:8px }
+.card {
+  padding:12px; border:1px solid #eef2fb;
+  border-radius:8px; background:linear-gradient(180deg,#fff,#fbfdff)
+}
+.muted { color:var(--muted) }
+
+/* chart */
+.chart-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart-box {
+  width: 100%;
+  max-width: 360px;
+  height: 280px;
+  position: relative;
+  margin: 0 auto; /* 置中 */
+}
+
+.chart-box canvas {
+  width: 100% !important;
+  height: 100% !important;
+}

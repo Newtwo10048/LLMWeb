@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>運動員營養師 AI</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="data:image/svg+xml;utf8,
+        <svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'>
+          <rect rx='8' width='36' height='36' fill='%230b6efd'/>
+          <text x='50%' y='57%' font-size='18' text-anchor='middle' fill='white' font-family='Arial'>AI</text>
+        </svg>" alt="logo"/>
+      <h1>運動員營養師 AI</h1>
+    </header>
+
+    <!-- 導覽列 -->
+    <nav id="mainTabs">
+      <button class="tab active" data-panel="loginPanel">登入</button>
+      <button class="tab" data-panel="profilePanel">個人資訊</button>
+      <button class="tab" data-panel="goalsPanel">目標</button>
+      <button class="tab" data-panel="dietPanel">飲食紀錄 & 建議</button>
+      <button class="tab" data-panel="habitsPanel">運動習慣</button>
+      <button class="tab" data-panel="qaPanel">AI 問答</button>
+      <button class="tab" data-panel="nutrientPanel">營養素查詢</button>
+    </nav>
+
+    <section class="panel">
+
+      <!-- 登入 -->
+      <div id="loginPanel" class="panelCard">
+        <div class="card">
+          <h3>登入（示範）</h3>
+          <form id="loginForm" style="display:flex;gap:8px;align-items:center">
+            <input id="loginEmail" placeholder="電子郵件" />
+            <input id="loginPass" type="password" placeholder="密碼" />
+            <button type="submit">登入</button>
+            <button type="'click'">登出</button>
+          </form>
+          <p id="loginHint" class="muted"></p>
+        </div>
+      </div>
+
+      <!-- 個人資訊 -->
+      <div id="profilePanel" class="panelCard locked" style="display:none">
+        <div class="card">
+          <h3>個人資訊</h3>
+          <form id="profileForm" class="grid">
+            <div>
+              <label>姓名</label>
+              <input id="name" />
+            </div>
+            <div>
+              <label>生日</label>
+              <input id="birthday" type="date" />
+            </div>
+            <div>
+              <label>身高 (cm)</label>
+              <input id="height" type="number" />
+            </div>
+            <div>
+              <label>體重 (kg)</label>
+              <input id="weight" type="number" />
+            </div>
+            <div>
+              <label>運動種類</label>
+              <select id="sportType">
+                <option value="baseball">棒球</option>
+                <option value="football">足球</option>
+                <option value="general">綜合訓練</option>
+              </select>
+            </div>
+            <div>
+              <label>性別</label>
+              <select id="gender">
+                <option value="male">男</option>
+                <option value="female">女</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="full">
+              <label>備註（過敏、特殊飲食）</label>
+              <textarea id="notes"></textarea>
+            </div>
+            <div class="full row">
+              <button id="saveProfile" type="button">儲存</button>
+              <button id="loadProfile" type="button">載入</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- GOALS -->
+      <div id="goalsPanel" class="panelCard" style="display:none">
+        <div class="card">
+          <h3>目標設定</h3>
+          <label>短期目標</label>
+          <input id="goalShort" />
+          <label>長期目標</label>
+          <input id="goalLong" />
+          <div style="margin-top:10px">
+            <button id="saveGoals">儲存目標</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIET & CHARTS -->
+      <div id="dietPanel" class="panelCard" style="display:none">
+        <div class="card">
+          <h3>飲食紀錄 & 建議</h3>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1">
+              <label>新增飲食紀錄（範例: 雞胸 150g）</label>
+              <div class="row">
+                <input id="foodName" placeholder="食物名稱" />
+                <input id="foodGrams" type="number" placeholder="克數" class="small" />
+                <button id="addLog">加入紀錄</button>
+              </div>
+              <div class="log-list" id="logs"></div>
+            </div>
+            <div style="width:480px">
+              <label>建議圖表</label>
+              <div class="chart-wrap">
+                <div class="chart-box card"><canvas id="pieChart"></canvas></div>
+                <div class="chart-box card"><canvas id="servingChart"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- HABITS -->
+      <div id="habitsPanel" class="panelCard" style="display:none">
+        <div class="card">
+          <h3>運動種類、頻率與時長</h3>
+          <div class="grid">
+            <div>
+              <label>每週訓練次數</label>
+              <input id="freqPerWeek" type="number" />
+            </div>
+            <div>
+              <label>每次時長（分鐘）</label>
+              <input id="durationMin" type="number" />
+            </div>
+            <div class="full">
+              <label>飲食習慣（勾選）</label>
+              <div class="row">
+                <label><input type="checkbox" id="mealBreakfast"> 早餐</label>
+                <label><input type="checkbox" id="mealLunch"> 午餐</label>
+                <label><input type="checkbox" id="mealDinner"> 晚餐</label>
+                <label><input type="checkbox" id="mealLate"> 宵夜</label>
+              </div>
+            </div>
+            <div class="full row"><button id="saveHabits">儲存習慣</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QA -->
+      <div id="qaPanel" class="panelCard" style="display:none">
+        <div class="card">
+          <h3>AI 問答（測試用介面）</h3>
+          <div>
+            <textarea id="qaInput" class="qa-area" placeholder="輸入問題，例如：我明天投手比賽，該吃什麼？"></textarea>
+            <div style="margin-top:8px"><button id="askBtn">送出給 AI</button></div>
+            <h4>回覆</h4>
+            <div id="qaResponse" class="muted"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NUTRIENT SEARCH -->
+      <div id="nutrientPanel" class="panelCard" style="display:none">
+        <div class="card">
+          <h3>營養素查詢（圖片 / 文字）</h3>
+          <label>文字查詢</label>
+          <div class="row">
+            <input id="nutrientQuery" placeholder="例如：雞胸 肌酸 含量"/>
+            <button id="nutrientSearch">查詢</button>
+          </div>
+
+          <label style="margin-top:10px">上傳食物圖片（後端須實作影像辨識 + RAG）</label>
+          <div class="row">
+            <input type="file" id="imgUpload" accept="image/*" />
+            <button id="imgSearch">用圖片查詢</button>
+          </div>
+          <img id="imgPreview" class="img-preview" src="" />
+
+          <h4>查詢結果</h4>
+          <div id="nutrientResult" class="muted"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
