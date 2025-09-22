@@ -39,7 +39,6 @@
             <input id="loginEmail" placeholder="電子郵件" />
             <input id="loginPass" type="password" placeholder="密碼" />
             <button type="submit">登入</button>
-            <button type="'click'">登出</button>
           </form>
           <p id="loginHint" class="muted"></p>
         </div>
@@ -103,7 +102,7 @@
           <label>長期目標</label>
           <input id="goalLong" />
           <div style="margin-top:10px">
-            <button id="saveGoals">儲存目標</button>
+            <button id="saveGoals" type="button">儲存目標</button>
           </div>
         </div>
       </div>
@@ -118,7 +117,7 @@
               <div class="row">
                 <input id="foodName" placeholder="食物名稱" />
                 <input id="foodGrams" type="number" placeholder="克數" class="small" />
-                <button id="addLog">加入紀錄</button>
+                <button id="addLog" type="button">加入紀錄</button>
               </div>
               <div class="log-list" id="logs"></div>
             </div>
@@ -132,8 +131,6 @@
           </div>
         </div>
       </div>
-
-
 
       <!-- HABITS -->
       <div id="habitsPanel" class="panelCard" style="display:none">
@@ -163,17 +160,16 @@
       </div>
 
       <!-- QA -->
-      <div id="qaPanel" class="panelCard" style="display:none">
+      <div id="qaPanel" class="panelCard">
         <div class="card">
-          <h3>AI 問答（測試用介面）</h3>
-          <div>
-            <textarea id="qaInput" class="qa-area" placeholder="輸入問題，例如：我明天投手比賽，該吃什麼？"></textarea>
-            <div style="margin-top:8px"><button id="askBtn">送出給 AI</button></div>
-            <h4>回覆</h4>
-            <div id="qaResponse" class="muted"></div>
-          </div>
+          <h3>AI 問答</h3>
+          <textarea id="qaInput" placeholder="輸入問題，例如：我明天投手比賽，該吃什麼？"></textarea>
+          <button id="askBtn">送出給 AI</button>
+          <h4>回覆</h4>
+          <div id="qaResponse" class="muted"></div>
         </div>
       </div>
+
 
       <!-- NUTRIENT SEARCH -->
       <div id="nutrientPanel" class="panelCard" style="display:none">
@@ -198,6 +194,7 @@
       </div>
     </section>
   </div>
+  <script src="qa.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

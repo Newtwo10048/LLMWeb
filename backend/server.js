@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const { spawn } = require("child_process");
 
 const app = express();
 app.use(cors());
@@ -50,5 +51,32 @@ app.get("/api/profile", (req, res) => {
   }
 });
 
+// ---- AI 問答 route ----
+app.post("/api/chat", (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ reply: "訊息不得為空" });
+
+  const llm = spawn("ollama", ["run", "llama3"]);
+  let reply = "";
+
+  llm.stdout.setEncoding("utf8");
+  llm.stdout.on("data", chunk => {
+    reply += chunk;
+  });
+
+  llm.stderr.on("data", chunk => {
+    console.error("Ollama error:", chunk);
+  });
+
+  llm.on("close", () => {
+    res.json({ reply: reply.trim() });
+  });
+
+  llm.stdin.write(message + "\n");
+  llm.stdin.end();
+});
+
+// ---- Server 啟動 ----
 const PORT = 3000;
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+

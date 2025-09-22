@@ -44,8 +44,10 @@ loginForm.addEventListener('submit', async (e)=>{
 
 // ---- 登出 ----
 const logoutBtn = document.createElement('button');
-logoutBtn.textContent = "登出";
-logoutBtn.addEventListener('click', ()=>{
+  logoutBtn.id = "logoutBtn";
+  logoutBtn.type = "button";
+  logoutBtn.textContent = "登出";
+  logoutBtn.addEventListener('click', ()=>{
   localStorage.removeItem('token');
   localStorage.removeItem('email');
   alert("已登出");
@@ -129,7 +131,7 @@ function updateCharts() {
 
   // ✅ 營養素圓餅圖
   if (!pieChart) {
-    const ctx = document.getElementById('nutrientPie').getContext('2d');
+    const ctx = document.getElementById('pieChart').getContext('2d');
     pieChart = new Chart(ctx, {
       type: 'pie',
       data: {
@@ -145,7 +147,7 @@ function updateCharts() {
 
   // ✅ 建議份數柱狀圖
   if (!barChart) {
-    const ctx2 = document.getElementById('portionBar').getContext('2d');
+    const ctx2 = document.getElementById('servingChart').getContext('2d');
     barChart = new Chart(ctx2, {
       type: 'bar',
       data: {
@@ -162,9 +164,13 @@ function updateCharts() {
 
 // ---- 載入 Profile ----
 async function loadProfile(email){
-  const res = await fetch("http://localhost:3000/api/profile?email=" + encodeURIComponent(email));
-  const profile = await res.json();
+  const token = localStorage.getItem('token');
+  const res = await fetch("http://localhost:3000/api/profile", {
+    method: "GET",
+    headers: { "Authorization": "Bearer " + token }
+  });
   if(res.ok){
+    const profile = await res.json();
     document.getElementById("name").value = profile.name;
     document.getElementById("height").value = profile.height;
     document.getElementById("weight").value = profile.weight;
@@ -186,5 +192,34 @@ window.addEventListener('load', async ()=>{
       localStorage.removeItem('email');
       document.getElementById('loginHint').textContent = '請重新登入';
     }
+  }
+});
+document.getElementById("askBtn").addEventListener("click", async () => {
+  const input = document.getElementById("qaInput");
+  const responseBox = document.getElementById("qaResponse");
+  const message = input.value.trim();
+  if (!message) return;
+
+  responseBox.innerHTML = "⏳ 等待 AI 回覆中...";
+
+  try {
+    const res = await fetch("http://localhost:3000/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+
+    // 逐字打字效果
+    responseBox.innerHTML = "";
+    let i = 0;
+    const interval = setInterval(() => {
+      responseBox.innerHTML += data.reply[i];
+      i++;
+      if (i >= data.reply.length) clearInterval(interval);
+    }, 30); // 每 30ms 打一個字
+
+  } catch (err) {
+    responseBox.innerHTML = "❌ 錯誤：" + err.message;
   }
 });

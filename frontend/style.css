@@ -38,15 +38,14 @@ input,select,textarea {
   gap: 16px;
 }
 
-.chart-box {
-  width: 100%;
-  max-width: 360px;
-  height: 280px;
-  position: relative;
-  margin: 0 auto; /* 置中 */
+.chart-wrap {
+  display: flex;
+  flex-wrap: wrap;   /* 手機會自動換行 */
+  gap: 16px;
 }
 
-.chart-box canvas {
-  width: 100% !important;
-  height: 100% !important;
+.chart-box {
+  flex: 1 1 300px;   /* 最小 300px，剩餘空間平均分配 */
+  max-width: 480px;
+  height: 280px;
 }
