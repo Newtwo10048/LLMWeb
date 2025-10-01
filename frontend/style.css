@@ -49,3 +49,7 @@ input,select,textarea {
   max-width: 480px;
   height: 280px;
 }
+
+#qaResponse {
+  white-space: pre-wrap; /* 保留 \n 換行 */
+}

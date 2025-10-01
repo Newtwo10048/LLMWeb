@@ -273,7 +273,14 @@ document.getElementById("askBtn").addEventListener("click", async () => {
   const message = input.value.trim();
   if (!message) return;
 
-  responseBox.innerHTML = "⏳ 等待 AI 回覆中...";
+  // 先把使用者訊息加入對話框
+  responseBox.innerHTML += `<div class="user-msg">你：${message}</div>`;
+
+  // 建立 AI 回覆容器，先顯示思考中
+  const aiDiv = document.createElement("div");
+  aiDiv.className = "ai-msg";
+  aiDiv.innerHTML = "⏳ AI思考中...";
+  responseBox.appendChild(aiDiv);
 
   try {
     const res = await fetch("http://localhost:3000/api/chat", {
@@ -281,18 +288,30 @@ document.getElementById("askBtn").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message })
     });
-    const data = await res.json();
 
-    // 逐字打字效果
-    responseBox.innerHTML = "";
-    let i = 0;
-    const interval = setInterval(() => {
-      responseBox.innerHTML += data.reply[i];
-      i++;
-      if (i >= data.reply.length) clearInterval(interval);
-    }, 30); // 每 30ms 打一個字
+    aiDiv.innerHTML = ""; // 清空思考中
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunkText = decoder.decode(value);
+
+      for (const char of chunkText) {
+        if (char === "\n") aiDiv.innerHTML += "<br>";
+        else aiDiv.innerHTML += char;
+        await new Promise(r => setTimeout(r, 30)); // 打字機效果
+      }
+    }
+
+    // 滾動到最新訊息
+    responseBox.scrollTop = responseBox.scrollHeight;
 
   } catch (err) {
-    responseBox.innerHTML = "❌ 錯誤：" + err.message;
+    aiDiv.innerHTML = "❌ 錯誤：" + err.message;
   }
+
+  input.value = ""; // 清空輸入框
 });

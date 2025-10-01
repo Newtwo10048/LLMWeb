@@ -17,10 +17,6 @@ app.use(express.static('public'));
 const APP_PORT = 3000;
 const SECRET_KEY = "超級秘密金鑰"; // JWT 用
 
-const password = "123456";
-const hash = bcrypt.hashSync(password, 10);
-console.log(hash);
-
 // MySQL 連線
 const db = mysql.createConnection({
   host: 'localhost',
@@ -172,17 +168,28 @@ app.delete("/api/logs/:id", authenticateToken, (req, res) => {
     res.json({ deleted: result.affectedRows });
   });
 });
-// ---- AI 問答 route ----
+
+// ---- 保留對話歷史 ----
+let conversationHistory = [];
+
 app.post("/api/chat", (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).json({ reply: "訊息不得為空" });
 
-  const llm = spawn("ollama", ["run", "llama3"]);
-  let reply = "";
+  // 把使用者訊息加入歷史
+  conversationHistory.push({ role: "user", content: message });
 
+  const llm = spawn("ollama", ["run", "llama3"]);
+
+  let reply = "";
   llm.stdout.setEncoding("utf8");
+
+  // 設定 headers 讓前端可以即時收到資料
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+
   llm.stdout.on("data", chunk => {
     reply += chunk;
+    res.write(chunk); // 逐 chunk 送給前端
   });
 
   llm.stderr.on("data", chunk => {
@@ -190,13 +197,19 @@ app.post("/api/chat", (req, res) => {
   });
 
   llm.on("close", () => {
-    res.json({ reply: reply.trim() });
+    conversationHistory.push({ role: "assistant", content: reply.trim() });
+    res.end(); // 結束傳輸
   });
 
-  llm.stdin.write(message + "\n");
+  // 把整個對話歷史傳給模型（可依 Ollama 需求調整）
+  // ---- 這裡加入強制繁體中文指令 ----
+  const systemPrompt = "請一定完全以繁體中文回覆我：\n";
+  let prompt = systemPrompt + conversationHistory.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.content}`).join("\n") + "\nAI:";
+  llm.stdin.write(prompt);
   llm.stdin.end();
 });
-// -------------------- 前端靜態 --------------------
+
+// 前端靜態
 app.use('/', express.static(path.join(__dirname, '..', 'frontend')));
 
 app.listen(APP_PORT, () => console.log(`Backend running on http://localhost:${APP_PORT}`));
