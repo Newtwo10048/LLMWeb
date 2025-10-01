@@ -108,42 +108,49 @@ document.getElementById('loadProfile').addEventListener('click', loadProfile);
 window.addEventListener("DOMContentLoaded", loadProfile);
 
 
-document.getElementById('saveProfile').addEventListener('click', async ()=>{
+document.getElementById('saveProfile').addEventListener('click', async () => {
   const token = localStorage.getItem("token");
   if(!token) return alert("請先登入");
 
   const data = {
     name: document.getElementById("name").value,
     birthday: document.getElementById("birthday").value,
-    height: parseInt(document.getElementById("height").value)||0,
-    weight: parseInt(document.getElementById("weight").value)||0,
+    height: parseInt(document.getElementById("height").value) || null,
+    weight: parseInt(document.getElementById("weight").value) || null,
     sportType: document.getElementById("sportType").value,
     gender: document.getElementById("gender").value,
     notes: document.getElementById("notes").value
   };
 
-  const res = await fetch("/api/profile", {
-    method: "POST",
-    headers: { "Content-Type":"application/json", "Authorization":"Bearer "+token },
-    body: JSON.stringify(data)
-  });
-  const result = await res.json();
-  
-  // alert 顯示儲存成功的資料
-  if(result.profile){
-    alert(`儲存成功！\n\n` +
-      `姓名: ${result.profile.name}\n` +
-      `生日: ${result.profile.birthday}\n` +
-      `身高: ${result.profile.height}\n` +
-      `體重: ${result.profile.weight}\n` +
-      `運動類型: ${result.profile.sportType}\n` +
-      `性別: ${result.profile.gender}\n` +
-      `備註: ${result.profile.notes}`
-    );
-  } else {
-    alert(result.message || '已儲存ok');
+  try {
+    const res = await fetch("/api/profile", {
+      method: "POST",
+      headers: { 
+        "Content-Type":"application/json", 
+        "Authorization":"Bearer " + token 
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+    if (result.profile) {
+      alert(`儲存成功！\n\n` +
+            `姓名: ${result.profile.name}\n` +
+            `生日: ${result.profile.birthday}\n` +
+            `身高: ${result.profile.height}\n` +
+            `體重: ${result.profile.weight}\n` +
+            `運動類型: ${result.profile.sportType}\n` +
+            `性別: ${result.profile.gender}\n` +
+            `備註: ${result.profile.notes}`);
+    } else {
+      alert(result.message || "已儲存完成");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("儲存失敗，請稍後再試");
   }
 });
+
 
 
 
@@ -289,8 +296,8 @@ document.getElementById("askBtn").addEventListener("click", async () => {
       body: JSON.stringify({ message })
     });
 
-    aiDiv.innerHTML = ""; // 清空思考中
-
+    aiDiv.innerHTML = "AI："; // 清空思考中
+    
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
 

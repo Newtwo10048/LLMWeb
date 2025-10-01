@@ -112,28 +112,41 @@ app.post("/api/profile", authenticateToken, (req, res) => {
   const userId = req.user.id;
   const { name, birthday, height, weight, sportType, gender, notes } = req.body;
 
-  const sql = `
-    INSERT INTO profiles (user_id, name, birthday, height, weight, sportType, gender, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      name=VALUES(name),
-      birthday=VALUES(birthday),
-      height=VALUES(height),
-      weight=VALUES(weight),
-      sportType=VALUES(sportType),
-      gender=VALUES(gender),
-      notes=VALUES(notes)
-  `;
-  db.query(sql, [userId, name, birthday, height, weight, sportType, gender, notes], (err, result) => {
+  const profileData = {
+    name: name || '',
+    birthday: birthday || null,
+    height: height || null,
+    weight: weight || null,
+    sportType: sportType || 'general',
+    gender: gender || 'male',
+    notes: notes || ''
+  };
+
+  db.query("SELECT * FROM profiles WHERE user_id=?", [userId], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
 
-    // 將儲存的資料也回傳
-    res.json({
-      message: "已儲存",
-      profile: { name, birthday, height, weight, sportType, gender, notes }
-    });
+    if (results.length === 0) {
+      // INSERT
+      const sql = "INSERT INTO profiles (user_id,name,birthday,height,weight,sportType,gender,notes) VALUES (?,?,?,?,?,?,?,?,?)";
+      db.query(sql, [userId, ...Object.values(profileData)], (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        // 回傳完整資料
+        res.json({ message: "已新增 profile", profile: { user_id: userId, ...profileData } });
+      });
+    } else {
+      // UPDATE
+      const sql = "UPDATE profiles SET name=?, birthday=?, height=?, weight=?, sportType=?, gender=?, notes=? WHERE user_id=?";
+      db.query(sql, [...Object.values(profileData), userId], (err3) => {
+        if (err3) return res.status(500).json({ error: err3.message });
+        // 回傳完整資料
+        res.json({ message: "已更新 profile", profile: { user_id: userId, ...profileData } });
+      });
+    }
   });
 });
+
+
+
 
 
 // -------------------- Logs --------------------
