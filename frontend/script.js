@@ -261,17 +261,51 @@ function updateCharts() {
 // ---- 初始化 ----
 window.addEventListener('load', async ()=>{
   const token = localStorage.getItem("token");
+  const responseBox = document.getElementById("qaResponse");
+  responseBox.innerHTML = ""; // 清空舊內容
+
   if(token){
     const email = await verifyToken(token);
     if(email){
       document.getElementById('loginHint').textContent = '已登入';
       unlockPanels();
       loadProfile();
-      loadLogs();
     } else {
       localStorage.removeItem('token');
       document.getElementById('loginHint').textContent = '請重新登入';
     }
+  }
+
+  try {
+    const res = await fetch("http://localhost:3000/api/chat/history", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    const history = await res.json();
+
+    console.log("載入的歷史紀錄：", history);
+
+    const userHistories = []; // 更新前端歷史陣列
+
+    history.forEach(m => {
+      if (m.role === "user") {
+        responseBox.innerHTML += `<div class="user-msg">你：${m.content}</div>`;
+        userHistories.push({ role: "user", content: m.content });
+      } else {
+        responseBox.innerHTML += `<div class="ai-msg">AI：${m.content}</div>`;
+        userHistories.push({ role: "assistant", content: m.content });
+      }
+    });
+
+    // 將前端歷史對話傳給 chat 功能使用
+    window.userHistories = userHistories;
+    
+    // 滾動到最新訊息
+    responseBox.scrollTop = responseBox.scrollHeight;
+
+    
+
+  } catch (err) {
+    console.error("載入歷史對話失敗：", err);
   }
 });
 document.getElementById("askBtn").addEventListener("click", async () => {
@@ -286,21 +320,39 @@ document.getElementById("askBtn").addEventListener("click", async () => {
   // 建立 AI 回覆容器，先顯示思考中
   const aiDiv = document.createElement("div");
   aiDiv.className = "ai-msg";
-  aiDiv.innerHTML = "⏳ AI思考中...";
+  aiDiv.innerHTML = "AI：⏳ AI思考中...";
   responseBox.appendChild(aiDiv);
 
   try {
+    const token = localStorage.getItem("token"); // 取 JWT
+
+    // 🔹 這裡組合完整歷史訊息（從 window.userHistories）
+    const historyText = (window.userHistories || []).map(m =>
+      `${m.role === "user" ? "User" : "AI"}: ${m.content}`
+    ).join("\n");
+
+    // 把當前輸入的訊息加進歷史（前端暫存用）
+    window.userHistories = [
+      ...(window.userHistories || []),
+      { role: "user", content: message }
+    ];
+
     const res = await fetch("http://localhost:3000/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message })
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token   // 這行很重要！
+      },
+      body: JSON.stringify({ message, history: historyText })
     });
+
 
     aiDiv.innerHTML = "AI："; // 清空思考中
     
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
 
+    let aiReply = "";
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -309,9 +361,14 @@ document.getElementById("askBtn").addEventListener("click", async () => {
       for (const char of chunkText) {
         if (char === "\n") aiDiv.innerHTML += "<br>";
         else aiDiv.innerHTML += char;
-        await new Promise(r => setTimeout(r, 30)); // 打字機效果
+        await new Promise(r => setTimeout(r, 15)); // 打字機效果
       }
+      aiReply += chunkText;
     }
+
+    // 儲存 AI 回覆到前端歷史（方便重載時保留）
+    window.userHistories.push({ role: "assistant", content: aiReply });
+
 
     // 滾動到最新訊息
     responseBox.scrollTop = responseBox.scrollHeight;

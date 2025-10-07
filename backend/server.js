@@ -127,7 +127,10 @@ app.post("/api/profile", authenticateToken, (req, res) => {
 
     if (results.length === 0) {
       // INSERT
-      const sql = "INSERT INTO profiles (user_id,name,birthday,height,weight,sportType,gender,notes) VALUES (?,?,?,?,?,?,?,?,?)";
+      const sql = `
+      INSERT INTO profiles (user_id, name, birthday, height, weight, sportType, gender, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ` ;
       db.query(sql, [userId, ...Object.values(profileData)], (err2) => {
         if (err2) return res.status(500).json({ error: err2.message });
         // 回傳完整資料
@@ -183,14 +186,26 @@ app.delete("/api/logs/:id", authenticateToken, (req, res) => {
 });
 
 // ---- 保留對話歷史 ----
-let conversationHistory = [];
+const userHistories = {}; // key: userId, value: array
 
-app.post("/api/chat", (req, res) => {
+app.post("/api/chat", authenticateToken, (req, res) => {
   const { message } = req.body;
+  const userId = req.user.id;
+
   if (!message) return res.status(400).json({ reply: "訊息不得為空" });
 
-  // 把使用者訊息加入歷史
-  conversationHistory.push({ role: "user", content: message });
+  // 初始化使用者對話歷史
+  if (!userHistories[userId]) userHistories[userId] = [];
+
+  // ---- 存使用者訊息 ----
+  userHistories[userId].push({ role: "user", content: message });
+
+  // 儲存使用者訊息到資料庫
+  db.query(
+    "INSERT INTO chat_logs (user_id, role, content) VALUES (?, 'user', ?)",
+    [userId, message],
+    (err) => { if (err) console.error("儲存使用者訊息失敗：", err); }
+  );
 
   const llm = spawn("ollama", ["run", "llama3"]);
 
@@ -205,21 +220,43 @@ app.post("/api/chat", (req, res) => {
     res.write(chunk); // 逐 chunk 送給前端
   });
 
-  llm.stderr.on("data", chunk => {
-    console.error("Ollama error:", chunk);
-  });
+  llm.stderr.on("data", chunk => console.error("Ollama error:", chunk));
 
   llm.on("close", () => {
-    conversationHistory.push({ role: "assistant", content: reply.trim() });
+    const replyText = reply.trim();
+    // 存入使用者對話歷史
+    userHistories[userId].push({ role: "assistant", content: replyText });
+
+    // 儲存 AI 回覆
+    db.query(
+      "INSERT INTO chat_logs (user_id, role, content) VALUES (?, 'assistant', ?)",
+      [userId, replyText],
+      (err) => { if (err) console.error("儲存 AI 回覆失敗：", err); }
+    );
+
     res.end(); // 結束傳輸
   });
 
-  // 把整個對話歷史傳給模型（可依 Ollama 需求調整）
-  // ---- 這裡加入強制繁體中文指令 ----
+  // // 把使用者的對話歷史傳給模型
   const systemPrompt = "請一定完全以繁體中文回覆我：\n";
-  let prompt = systemPrompt + conversationHistory.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.content}`).join("\n") + "\nAI:";
+  const historyText = userHistories[userId]
+    .map(m => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
+    .join("\n");
+  const prompt = systemPrompt + historyText + "\nAI:";
+
+
   llm.stdin.write(prompt);
   llm.stdin.end();
+});
+// 取得使用者歷史對話
+app.get("/api/chat/history", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const sql = "SELECT role, content, created_at FROM chat_logs WHERE user_id=? ORDER BY created_at ASC";
+  
+  db.query(sql, [userId], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results); // 回傳一個陣列 [{role, content, created_at}, ...]
+  });
 });
 
 // 前端靜態
