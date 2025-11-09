@@ -1,33 +1,80 @@
-
-// ---- Memory Storage (替代 localStorage) ----
+// ==================== Memory Storage (替代 localStorage) ====================
 const memory = {
   token: null,
   email: null,
+  userName: null,
+  userPicture: null,
   athlete_logs: []
 };
 
-// ---- Tabs ----
-document.querySelectorAll('#mainTabs .tab').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
+// ==================== 統一的 API 請求函數 ====================
+async function apiRequest(url, options = {}) {
+  console.log('🌐 發送請求:', url, options.method || 'GET');
+  
+  const headers = { 
+    'Content-Type': 'application/json',
+    ...options.headers 
+  };
+
+  // 自動附加 token
+  if (memory.token && options.includeAuth !== false) {
+    headers['Authorization'] = `Bearer ${memory.token}`;
+    console.log('🔑 使用 Token:', memory.token.substring(0, 20) + '...');
+  }
+
+  const config = {
+    ...options,
+    headers
+  };
+
+  try {
+    console.log('⏳ 等待回應...');
+    const response = await fetch(url, config);
+    
+    console.log('📨 收到回應:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('❌ API 錯誤回應:', text);
+      throw new Error(`API Error (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ 解析成功:', data);
+    return data;
+  } catch (err) {
+    console.error('❌ API Request 錯誤:', err);
+    console.error('錯誤詳情:', {
+      url,
+      method: options.method || 'GET',
+      hasToken: !!memory.token,
+      error: err.message
+    });
+    throw err;
+  }
+}
+
+// ==================== 分頁切換 ====================
+document.querySelectorAll('#mainTabs .tab').forEach(btn => {
+  btn.addEventListener('click', () => {
     const token = memory.token;
-    if(!token && btn.dataset.panel !== 'loginPanel' && btn.dataset.panel !== 'registerPanel'){
+    if (!token && btn.dataset.panel !== 'loginPanel' && btn.dataset.panel !== 'registerPanel') {
       alert("請先登入");
       return;
     }
-    document.querySelectorAll('#mainTabs .tab').forEach(b=>b.classList.remove('active'));
+    
+    document.querySelectorAll('#mainTabs .tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.querySelectorAll('.panelCard').forEach(p=>p.style.display='none');
-    document.getElementById(btn.dataset.panel).style.display='block';
+    
+    document.querySelectorAll('.panelCard').forEach(p => p.style.display = 'none');
+    document.getElementById(btn.dataset.panel).style.display = 'block';
   });
 });
-/// 確保 DOM 完全載入
-    console.log('🚀 註冊頁面腳本載入');
 
-// 確保 DOM 完全載入
+// ==================== 註冊功能 ====================
 document.addEventListener('DOMContentLoaded', function() {
   console.log('✅ DOM 載入完成');
 
-  // === 獲取所有元素 ===
   const registerBtn = document.getElementById('register-btn');
   const emailInput = document.getElementById('register-email');
   const passwordInput = document.getElementById('register-password');
@@ -38,347 +85,297 @@ document.addEventListener('DOMContentLoaded', function() {
   const reqLetter = document.getElementById('req-letter');
   const reqNumber = document.getElementById('req-number');
 
-  // 檢查元素是否存在
-  console.log('元素檢查:', {
-    registerBtn: !!registerBtn,
-    emailInput: !!emailInput,
-    passwordInput: !!passwordInput,
-    confirmInput: !!confirmInput,
-    msgEl: !!msgEl
-  });
-
-  if (!registerBtn || !emailInput || !passwordInput || !confirmInput || !msgEl) {
-    console.error('❌ 缺少必要的 DOM 元素');
+  if (!registerBtn) {
+    console.warn('⚠️ 註冊按鈕不存在，跳過註冊功能初始化');
     return;
   }
 
-  // === 密碼強度檢測 ===
-  passwordInput.addEventListener('input', function(e) {
+  // 密碼強度檢測
+  passwordInput?.addEventListener('input', function(e) {
     const password = e.target.value;
     let strength = 0;
 
-    // 檢查長度
     if (password.length >= 6) {
-      reqLength.classList.add('valid');
+      reqLength?.classList.add('valid');
       strength++;
     } else {
-      reqLength.classList.remove('valid');
+      reqLength?.classList.remove('valid');
     }
 
-    // 檢查字母
     if (/[a-zA-Z]/.test(password)) {
-      reqLetter.classList.add('valid');
+      reqLetter?.classList.add('valid');
       strength++;
     } else {
-      reqLetter.classList.remove('valid');
+      reqLetter?.classList.remove('valid');
     }
 
-    // 檢查數字
     if (/[0-9]/.test(password)) {
-      reqNumber.classList.add('valid');
+      reqNumber?.classList.add('valid');
       strength++;
     } else {
-      reqNumber.classList.remove('valid');
+      reqNumber?.classList.remove('valid');
     }
 
-    // 更新強度條
-    strengthFill.className = 'strength-fill';
-    if (strength === 1) strengthFill.classList.add('strength-weak');
-    else if (strength === 2) strengthFill.classList.add('strength-medium');
-    else if (strength === 3) strengthFill.classList.add('strength-strong');
+    if (strengthFill) {
+      strengthFill.className = 'strength-fill';
+      if (strength === 1) strengthFill.classList.add('strength-weak');
+      else if (strength === 2) strengthFill.classList.add('strength-medium');
+      else if (strength === 3) strengthFill.classList.add('strength-strong');
+    }
   });
 
-  // === 輔助函數：顯示訊息 ===
   function showMessage(message, type) {
-    console.log(`📢 訊息: [${type}] ${message}`);
-    msgEl.textContent = message;
-    msgEl.className = `register-msg show ${type}`;
+    if (msgEl) {
+      msgEl.textContent = message;
+      msgEl.className = `register-msg show ${type}`;
+    }
   }
 
-  // === 輔助函數：清除所有錯誤樣式 ===
   function clearErrors() {
-    emailInput.classList.remove('error');
-    passwordInput.classList.remove('error');
-    confirmInput.classList.remove('error');
+    emailInput?.classList.remove('error');
+    passwordInput?.classList.remove('error');
+    confirmInput?.classList.remove('error');
   }
 
-  // === 輔助函數：驗證 Email 格式 ===
   function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  // === 註冊按鈕事件 ===
   registerBtn.addEventListener('click', async function() {
-    console.log('🔘 註冊按鈕被點擊');
-
-    // 清空訊息和錯誤樣式
-    msgEl.className = 'register-msg';
+    if (msgEl) msgEl.className = 'register-msg';
     clearErrors();
 
-    // 獲取輸入值
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-    const confirm = confirmInput.value;
+    const email = emailInput?.value.trim();
+    const password = passwordInput?.value;
+    const confirm = confirmInput?.value;
 
-    console.log('📝 輸入值:', {
-      email: email ? '✓' : '✗',
-      password: password ? '✓' : '✗',
-      confirm: confirm ? '✓' : '✗'
-    });
-
-    // === 前端驗證 ===
-
-    // 1. 檢查是否為空
     if (!email || !password || !confirm) {
-      console.warn('⚠️ 驗證失敗: 欄位為空');
-      if (!email) emailInput.classList.add('error');
-      if (!password) passwordInput.classList.add('error');
-      if (!confirm) confirmInput.classList.add('error');
+      if (!email) emailInput?.classList.add('error');
+      if (!password) passwordInput?.classList.add('error');
+      if (!confirm) confirmInput?.classList.add('error');
       showMessage('請填寫所有欄位', 'error');
       return;
     }
 
-    // 2. Email 格式驗證
     if (!isValidEmail(email)) {
-      console.warn('⚠️ 驗證失敗: Email 格式不正確');
-      emailInput.classList.add('error');
+      emailInput?.classList.add('error');
       showMessage('請輸入有效的 Email 格式', 'error');
       return;
     }
 
-    // 3. 密碼長度驗證
     if (password.length < 6) {
-      console.warn('⚠️ 驗證失敗: 密碼太短');
-      passwordInput.classList.add('error');
+      passwordInput?.classList.add('error');
       showMessage('密碼至少需要 6 個字元', 'error');
       return;
     }
 
-    // 4. 密碼確認
     if (password !== confirm) {
-      console.warn('⚠️ 驗證失敗: 密碼不一致');
-      passwordInput.classList.add('error');
-      confirmInput.classList.add('error');
+      passwordInput?.classList.add('error');
+      confirmInput?.classList.add('error');
       showMessage('兩次密碼輸入不一致', 'error');
       return;
     }
 
-    console.log('✅ 前端驗證通過，準備發送請求');
-
-    // === 發送註冊請求 ===
     try {
       showMessage('註冊中...', 'info');
       registerBtn.disabled = true;
       registerBtn.textContent = '註冊中...';
 
-      console.log('📤 發送 POST 請求到 /api/register');
-
-      const res = await fetch('/api/register', {
+      const data = await apiRequest('http://localhost:3000/api/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        includeAuth: false
       });
 
-      console.log('📥 收到回應:', res.status, res.statusText);
+      showMessage(data.message || '註冊成功！', 'success');
 
-      const data = await res.json();
-      console.log('📦 回應資料:', data);
+      emailInput.value = '';
+      passwordInput.value = '';
+      confirmInput.value = '';
 
-      if (res.ok) {
-        // 註冊成功
-        console.log('🎉 註冊成功!');
-        showMessage(data.message || '註冊成功！', 'success');
+      if (strengthFill) strengthFill.className = 'strength-fill';
+      reqLength?.classList.remove('valid');
+      reqLetter?.classList.remove('valid');
+      reqNumber?.classList.remove('valid');
 
-        // 清空表單
-        emailInput.value = '';
-        passwordInput.value = '';
-        confirmInput.value = '';
-
-        // 重置密碼強度指示器
-        strengthFill.className = 'strength-fill';
-        reqLength.classList.remove('valid');
-        reqLetter.classList.remove('valid');
-        reqNumber.classList.remove('valid');
-
-        // 2秒後跳轉到登入頁
-        setTimeout(() => {
-          console.log('🔄 跳轉到登入頁面');
-          window.location.href = 'index.html';
-        }, 2000);
-
-      } else {
-        // 註冊失敗
-        console.error('❌ 註冊失敗:', data.message);
-        showMessage(data.message || '註冊失敗', 'error');
-        
-        // 如果是 Email 重複，標記 Email 輸入框
-        if (data.message && data.message.includes('Email')) {
-          emailInput.classList.add('error');
-        }
-      }
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
 
     } catch (err) {
-      console.error('🔥 請求錯誤:', err);
-      showMessage('網路錯誤，請檢查連線後再試', 'error');
+      showMessage(err.message || '網路錯誤，請檢查連線後再試', 'error');
     } finally {
       registerBtn.disabled = false;
       registerBtn.textContent = '註冊帳號';
     }
   });
 
-  // === Enter 鍵提交 ===
-  confirmInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      console.log('⌨️ Enter 鍵觸發註冊');
-      registerBtn.click();
-    }
+  confirmInput?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') registerBtn.click();
   });
-
-  console.log('✅ 事件監聽器已設置完成');
 });
 
-
-    // 切換到登入頁
-    /*
-    document.getElementById('switchToLogin')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      // 這裡可以切換到登入頁面
-      window.location.href = '/login.html';
-    });
-    */
-// ---- 登入 ----
-document.getElementById('loginForm')?.addEventListener('submit', async (e)=>{
+// ==================== 一般登入 ====================
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
+  console.log('🔐 開始登入流程');
+  
   const email = document.getElementById('loginEmail')?.value;
   const pass = document.getElementById('loginPass')?.value;
+  const loginHint = document.getElementById('loginHint');
 
   try {
-    const res = await fetch("/api/login", {
+    const data = await apiRequest("http://localhost:3000/api/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: pass })
+      body: JSON.stringify({ email, password: pass }),
+      includeAuth: false
     });
-    const data = await res.json();
-    if(res.ok && data.token){
+
+    if (data.token) {
+      // ✅ 儲存到 memory
       memory.token = data.token;
       memory.email = email;
-      document.getElementById('loginHint').textContent = '登入成功';
+      
+      console.log('✅ Token 已儲存:', memory.token.substring(0, 20) + '...');
+      
+      if (loginHint) loginHint.textContent = '登入成功';
+      
+      // 解鎖功能並載入資料
       unlockPanels();
+      
+      // 載入所有資料
+      await Promise.all([
+        loadProfile(),
+        loadGoals(),
+        loadDietLogs(),
+        loadHabits(),
+        loadChatHistory()
+      ]);
+      
+      console.log('✅ 所有資料載入完成');
+      
+      // 切換到個人資料頁
       document.querySelector('[data-panel="profilePanel"]')?.click();
-      loadProfile();
-      loadGoals();
-      loadDietLogs();
-      loadHabits();
-      loadChatHistory();
     } else {
-      document.getElementById('loginHint').textContent = data.message || '登入失敗';
+      if (loginHint) loginHint.textContent = data.message || '登入失敗';
     }
-  } catch(err){
-    document.getElementById('loginHint').textContent = "網路錯誤：" + err.message;
+  } catch(err) {
+    console.error('❌ 登入錯誤:', err);
+    if (loginHint) loginHint.textContent = "網路錯誤：" + err.message;
   }
 });
-//google
-window.onGoogleLibraryLoad = () => {
-  google.accounts.id.initialize({
-    client_id: "1012981023049-l4nvkheq3s0ql1hokvn4uofsl2h4pr5r.apps.googleusercontent.com",
-    callback: (response) => {
-      console.log("credential", response.credential);
-      // 這裡可以 POST 到後端
+
+// ==================== Google 登入 ====================
+window.handleGoogleLogin = async function(response) {
+  console.log("=== Google 登入流程開始 ===");
+  
+  if (!response.credential) {
+    alert("❌ 沒有收到 Google credential");
+    return;
+  }
+  
+  try {
+    const data = await apiRequest("http://localhost:3000/api/google-login", {
+      method: "POST",
+      body: JSON.stringify({ credential: response.credential }),
+      includeAuth: false
+    });
+    
+    if (data.user) {
+      // ✅ 儲存到 memory
+      memory.email = data.user.email;
+      memory.userName = data.user.name;
+      memory.userPicture = data.user.avatar_url;
+      memory.token = data.token;
+      
+      console.log('✅ Google 登入成功，Token 已儲存');
+      
+      const loginHint = document.getElementById('loginHint');
+      if (loginHint) {
+        loginHint.textContent = `歡迎 ${data.user.name}!`;
+        loginHint.style.color = 'green';
+      }
+      
+      unlockPanels();
+      
+      setTimeout(async () => {
+        document.querySelector('.tab[data-panel="profilePanel"]')?.click();
+        
+        await Promise.all([
+          loadProfile(),
+          loadGoals(),
+          loadDietLogs(),
+          loadHabits(),
+          loadChatHistory()
+        ]);
+        
+        console.log('✅ 資料載入完成');
+      }, 500);
+      
     }
-  });
+  } catch (err) {
+    console.error("❌ Google 登入錯誤:", err);
+    alert("Google 登入失敗：" + err.message);
+  }
 };
 
-// ---- 註冊 ----
-document.getElementById("register-btn")?.addEventListener("click", async () => {
-  const msgEl = document.getElementById("register-msg");
-  if(msgEl) msgEl.textContent = "";
-  const email = (document.getElementById("email")?.value || "").trim();
-  const password = document.getElementById("password")?.value || "";
-  if(!email || !password){ 
-    if(msgEl) msgEl.textContent="請輸入帳號與密碼"; 
-    return; 
-  }
-
-  try {
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if(msgEl) msgEl.textContent = data.message || "註冊成功";
-  } catch(e){ 
-    if(msgEl) msgEl.textContent="網路錯誤"; 
-  }
-});
-
-// ---- 登出 ----
+// ==================== 登出 ====================
 const logoutBtn = document.createElement('button');
-logoutBtn.id="logoutBtn"; logoutBtn.type="button"; logoutBtn.textContent="登出";
-logoutBtn.addEventListener('click', ()=>{
+logoutBtn.id = "logoutBtn";
+logoutBtn.type = "button";
+logoutBtn.textContent = "登出";
+logoutBtn.addEventListener('click', () => {
   memory.token = null;
   memory.email = null;
+  memory.userName = null;
+  memory.userPicture = null;
   memory.athlete_logs = [];
   location.reload();
 });
 document.querySelector('header')?.appendChild(logoutBtn);
 
-// ---- Token 驗證 ----
-async function verifyToken(token){
-  try{
-    const res = await fetch("/api/verify-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token })
-    });
-    const data = await res.json();
-    return res.ok && data.valid ? data.email : null;
-  } catch(e){ return null; }
-}
-
+// ==================== 解鎖面板 ====================
 function unlockPanels() {
   document.querySelectorAll('.panelCard').forEach(p => p.classList.remove('locked'));
   updateCharts();
 }
 
-// ---- Profile ----
-async function loadProfile(){
-  const token = memory.token;
-  if(!token) return;
+// ==================== Profile 個人資料 ====================
+async function loadProfile() {
+  if (!memory.token) {
+    console.warn('⚠️ 無 token，跳過載入個人資料');
+    return;
+  }
+  
+  console.log('📥 載入個人資料...');
+  
   try {
-    const res = await fetch("/api/profile", { headers: { "Authorization":"Bearer "+token } });
-    if(res.ok){
-      const data = await res.json();
-      const nameEl = document.getElementById("name");
-      const bdayEl = document.getElementById("birthday");
-      const heightEl = document.getElementById("height");
-      const weightEl = document.getElementById("weight");
-      const sportEl = document.getElementById("sportType");
-      const genderEl = document.getElementById("gender");
-      const notesEl = document.getElementById("notes");
-      
-      if(nameEl) nameEl.value = data.name || '';
-      if(bdayEl) bdayEl.value = data.birthday || '';
-      if(heightEl) heightEl.value = data.height || '';
-      if(weightEl) weightEl.value = data.weight || '';
-      if(sportEl) sportEl.value = data.sportType || 'general';
-      if(genderEl) genderEl.value = data.gender || 'male';
-      if(notesEl) notesEl.value = data.notes || '';
-    }
-  } catch(err) {
-    console.error('載入個人資料失敗:', err);
+    const data = await apiRequest("http://localhost:3000/api/profile");
+    
+    console.log('✅ 個人資料載入成功:', data);
+    
+    const nameEl = document.getElementById("name");
+    const bdayEl = document.getElementById("birthday");
+    const heightEl = document.getElementById("height");
+    const weightEl = document.getElementById("weight");
+    const sportEl = document.getElementById("sportType");
+    const genderEl = document.getElementById("gender");
+    const notesEl = document.getElementById("notes");
+    
+    if (nameEl) nameEl.value = data.name || '';
+    if (bdayEl) bdayEl.value = data.birthday || '';
+    if (heightEl) heightEl.value = data.height || '';
+    if (weightEl) weightEl.value = data.weight || '';
+    if (sportEl) sportEl.value = data.sportType || 'general';
+    if (genderEl) genderEl.value = data.gender || 'male';
+    if (notesEl) notesEl.value = data.notes || '';
+  } catch (err) {
+    console.error('❌ 載入個人資料失敗:', err);
   }
 }
 
-document.getElementById('loadProfile')?.addEventListener('click', loadProfile);
-window.addEventListener("DOMContentLoaded", loadProfile);
-
 document.getElementById('saveProfile')?.addEventListener('click', async () => {
-  const token = memory.token;
-  if(!token) return alert("請先登入");
+  if (!memory.token) return alert("請先登入");
 
   const data = {
     name: document.getElementById("name")?.value || '',
@@ -391,134 +388,162 @@ document.getElementById('saveProfile')?.addEventListener('click', async () => {
   };
 
   try {
-    const res = await fetch("/api/profile", {
+    const result = await apiRequest("http://localhost:3000/api/profile", {
       method: "POST",
-      headers: { 
-        "Content-Type":"application/json", 
-        "Authorization":"Bearer " + token 
-      },
       body: JSON.stringify(data)
     });
 
-    const result = await res.json();
-    if (result.profile) {
-      alert(`儲存成功！\n\n` +
-            `姓名: ${result.profile.name}\n` +
-            `生日: ${result.profile.birthday}\n` +
-            `身高: ${result.profile.height}\n` +
-            `體重: ${result.profile.weight}\n` +
-            `運動類型: ${result.profile.sportType}\n` +
-            `性別: ${result.profile.gender}\n` +
-            `備註: ${result.profile.notes}`);
-    } else {
-      alert(result.message || "已儲存完成");
-    }
+    alert(result.message || "已儲存完成");
   } catch (err) {
     console.error(err);
     alert("儲存失敗，請稍後再試");
   }
 });
 
-// ---- Goals ----
+// ==================== Goals 目標 ====================
+async function loadGoals() {
+  if (!memory.token) {
+    console.warn('⚠️ 無 token，跳過載入目標');
+    return;
+  }
+  
+  console.log('📥 載入目標...');
+  
+  try {
+    const data = await apiRequest("http://localhost:3000/api/goals");
+    
+    console.log('✅ 目標載入成功:', data);
+    
+    const shortEl = document.getElementById("goalShort");
+    const longEl = document.getElementById("goalLong");
+    if (shortEl) shortEl.value = data.short_goal || "";
+    if (longEl) longEl.value = data.long_goal || "";
+  } catch (err) {
+    console.error('❌ 載入目標失敗:', err);
+  }
+}
+
 document.getElementById("saveGoals")?.addEventListener("click", async () => {
-  const token = memory.token;
+  if (!memory.token) return alert("請先登入");
+  
   const short_goal = document.getElementById("goalShort")?.value || '';
   const long_goal = document.getElementById("goalLong")?.value || '';
   
   try {
-    await fetch("http://localhost:3000/api/goals", {
+    await apiRequest("http://localhost:3000/api/goals", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
       body: JSON.stringify({ short_goal, long_goal })
     });
     alert("目標已儲存");
-  } catch(err) {
+  } catch (err) {
     console.error('儲存目標失敗:', err);
     alert("儲存失敗，請稍後再試");
   }
 });
 
-async function loadGoals() {
-  const token = memory.token;
-  if(!token) return;
-  
-  try {
-    const res = await fetch("http://localhost:3000/api/goals", { 
-      headers: { "Authorization": "Bearer " + token } 
-    });
-    const data = await res.json();
-    
-    const shortEl = document.getElementById("goalShort");
-    const longEl = document.getElementById("goalLong");
-    if(shortEl) shortEl.value = data.short_goal || "";
-    if(longEl) longEl.value = data.long_goal || "";
-  } catch(err) {
-    console.error('載入目標失敗:', err);
-  }
-}
-
-// ---- Diet Logs ----
+// ==================== Diet Logs 飲食記錄 ====================
 async function loadDietLogs() {
-  const token = memory.token;
-  if(!token) return;
+  if (!memory.token) {
+    console.warn('⚠️ 無 token，跳過載入飲食記錄');
+    return;
+  }
+  
+  console.log('📥 載入飲食記錄...');
   
   try {
-    const res = await fetch("http://localhost:3000/api/diet/logs", { 
-      headers: { "Authorization": "Bearer " + token } 
-    });
-    const data = await res.json();
+    const data = await apiRequest("http://localhost:3000/api/diet/logs");
+    
+    console.log('✅ 飲食記錄載入成功:', data);
+    
     const box = document.getElementById("logs");
     
-    // 防止 data 不是陣列
-    if(!Array.isArray(data)) {
-      console.warn('飲食記錄格式錯誤:', data);
-      if(box) box.innerHTML = '<div class="muted">暫無飲食記錄</div>';
+    if (!Array.isArray(data)) {
+      console.warn('⚠️ 飲食記錄格式錯誤:', data);
+      if (box) box.innerHTML = '<div class="muted">暫無飲食記錄</div>';
       return;
     }
     
-    if(box) {
-      box.innerHTML = data.map(d => 
-        `<div>${d.food_name} ${d.grams}g (${d.created_at || ''})</div>`
-      ).join("");
+    if (box) {
+      if (data.length === 0) {
+        box.innerHTML = '<div class="muted">暫無飲食記錄</div>';
+      } else {
+        box.innerHTML = data.map(d => 
+          `<div>${d.food_name} ${d.grams}g (${d.created_at || ''})</div>`
+        ).join("");
+      }
     }
-  } catch(err) {
-    console.error('載入飲食記錄失敗:', err);
+    
+    // 更新 memory
+    memory.athlete_logs = data;
+  } catch (err) {
+    console.error('❌ 載入飲食記錄失敗:', err);
   }
 }
 
 document.getElementById("addLog")?.addEventListener("click", async () => {
-  const token = memory.token;
+  if (!memory.token) return alert("請先登入");
+  
   const food_name = document.getElementById("foodName")?.value?.trim() || '';
   const grams = document.getElementById("foodGrams")?.value || 0;
   
-  if(!food_name || grams <= 0) {
+  if (!food_name || grams <= 0) {
     return alert('請輸入食物名稱與克數');
   }
   
   try {
-    await fetch("http://localhost:3000/api/diet", {
+    await apiRequest("http://localhost:3000/api/diet", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
       body: JSON.stringify({ food_name, grams })
     });
     
-    // 清空輸入
     const nameEl = document.getElementById("foodName");
     const gramsEl = document.getElementById("foodGrams");
-    if(nameEl) nameEl.value = '';
-    if(gramsEl) gramsEl.value = '';
+    if (nameEl) nameEl.value = '';
+    if (gramsEl) gramsEl.value = '';
     
-    loadDietLogs(); // 更新畫面
+    await loadDietLogs();
     updateCharts();
-  } catch(err) {
+  } catch (err) {
     console.error('新增飲食記錄失敗:', err);
     alert('新增失敗，請稍後再試');
   }
 });
 
-// ---- Habits ----
+// ==================== Habits 運動習慣 ====================
+async function loadHabits() {
+  if (!memory.token) {
+    console.warn('⚠️ 無 token，跳過載入運動習慣');
+    return;
+  }
+  
+  console.log('📥 載入運動習慣...');
+  
+  try {
+    const h = await apiRequest("http://localhost:3000/api/habits");
+    
+    console.log('✅ 運動習慣載入成功:', h);
+    
+    const freqEl = document.getElementById("freqPerWeek");
+    const durEl = document.getElementById("durationMin");
+    const bfEl = document.getElementById("mealBreakfast");
+    const lunchEl = document.getElementById("mealLunch");
+    const dinnerEl = document.getElementById("mealDinner");
+    const lateEl = document.getElementById("mealLate");
+    
+    if (freqEl) freqEl.value = h.freq_per_week || "";
+    if (durEl) durEl.value = h.duration_min || "";
+    if (bfEl) bfEl.checked = h.meal_breakfast || false;
+    if (lunchEl) lunchEl.checked = h.meal_lunch || false;
+    if (dinnerEl) dinnerEl.checked = h.meal_dinner || false;
+    if (lateEl) lateEl.checked = h.meal_late || false;
+  } catch (err) {
+    console.error('❌ 載入運動習慣失敗:', err);
+  }
+}
+
 document.getElementById("saveHabits")?.addEventListener("click", async () => {
-  const token = memory.token;
+  if (!memory.token) return alert("請先登入");
+  
   const payload = {
     freq_per_week: +(document.getElementById("freqPerWeek")?.value || 0),
     duration_min: +(document.getElementById("durationMin")?.value || 0),
@@ -529,60 +554,30 @@ document.getElementById("saveHabits")?.addEventListener("click", async () => {
   };
   
   try {
-    await fetch("http://localhost:3000/api/habits", {
+    await apiRequest("http://localhost:3000/api/habits", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
       body: JSON.stringify(payload)
     });
     alert("運動習慣已儲存");
-  } catch(err) {
+  } catch (err) {
     console.error('儲存運動習慣失敗:', err);
     alert("儲存失敗，請稍後再試");
   }
 });
 
-async function loadHabits() {
-  const token = memory.token;
-  if(!token) return;
-  
-  try {
-    const res = await fetch("http://localhost:3000/api/habits", { 
-      headers: { "Authorization": "Bearer " + token } 
-    });
-    const h = await res.json();
-    
-    const freqEl = document.getElementById("freqPerWeek");
-    const durEl = document.getElementById("durationMin");
-    const bfEl = document.getElementById("mealBreakfast");
-    const lunchEl = document.getElementById("mealLunch");
-    const dinnerEl = document.getElementById("mealDinner");
-    const lateEl = document.getElementById("mealLate");
-    
-    if(freqEl) freqEl.value = h.freq_per_week || "";
-    if(durEl) durEl.value = h.duration_min || "";
-    if(bfEl) bfEl.checked = h.meal_breakfast || false;
-    if(lunchEl) lunchEl.checked = h.meal_lunch || false;
-    if(dinnerEl) dinnerEl.checked = h.meal_dinner || false;
-    if(lateEl) lateEl.checked = h.meal_late || false;
-  } catch(err) {
-    console.error('載入運動習慣失敗:', err);
-  }
-}
-
-// ---- Chart.js ----
+// ==================== Chart.js ====================
 let pieChart, barChart;
 
 function updateCharts() {
   const logs = memory.athlete_logs || [];
-  const total = logs.reduce((s, l) => s + l.grams, 0) || 1;
+  const total = logs.reduce((s, l) => s + (parseInt(l.grams) || 0), 0) || 1;
   const protein = Math.round(total * 0.3);
   const carbs = Math.round(total * 0.5);
   const fat = Math.max(total - protein - carbs, 0);
   const servings = Math.ceil(total / 100);
 
-  // 營養素圓餅圖
   const pieCtx = document.getElementById('pieChart');
-  if(!pieCtx) return;
+  if (!pieCtx) return;
   
   if (!pieChart) {
     pieChart = new Chart(pieCtx.getContext('2d'), {
@@ -598,9 +593,8 @@ function updateCharts() {
     pieChart.update();
   }
 
-  // 建議份數柱狀圖
   const barCtx = document.getElementById('servingChart');
-  if(!barCtx) return;
+  if (!barCtx) return;
   
   if (!barChart) {
     barChart = new Chart(barCtx.getContext('2d'), {
@@ -617,27 +611,28 @@ function updateCharts() {
   }
 }
 
-// ---- Chat History ----
+// ==================== Chat History ====================
 window.userHistories = [];
 
 async function loadChatHistory() {
-  const token = memory.token;
-  if(!token) return;
+  if (!memory.token) {
+    console.warn('⚠️ 無 token，跳過載入對話歷史');
+    return;
+  }
+  
+  console.log('📥 載入對話歷史...');
   
   const responseBox = document.getElementById("qaResponse");
-  if(!responseBox) return;
+  if (!responseBox) return;
   
   responseBox.innerHTML = "";
 
   try {
-    const res = await fetch("http://localhost:3000/api/chat/history", {
-      headers: { "Authorization": "Bearer " + token }
-    });
-    const history = await res.json();
+    const history = await apiRequest("http://localhost:3000/api/chat/history");
 
-    console.log("載入的歷史紀錄：", history);
+    console.log("✅ 對話歷史載入成功：", history);
 
-    if(Array.isArray(history)) {
+    if (Array.isArray(history)) {
       history.forEach(m => {
         if (m.role === "user") {
           responseBox.innerHTML += `<div class="user-msg">你：${m.content}</div>`;
@@ -651,50 +646,40 @@ async function loadChatHistory() {
     
     responseBox.scrollTop = responseBox.scrollHeight;
   } catch (err) {
-    console.error("載入歷史對話失敗：", err);
+    console.error("❌ 載入歷史對話失敗：", err);
   }
 }
 
 // 清除對話歷史
 async function clearChatHistory() {
-  const token = memory.token;
-  if(!token) return alert("請先登入");
+  if (!memory.token) return alert("請先登入");
   
-  if(!confirm("確定要清除所有對話歷史嗎？此操作無法復原。")) {
-    return;
-  }
+  if (!confirm("確定要清除所有對話歷史嗎？此操作無法復原。")) return;
   
   try {
-    const res = await fetch("http://localhost:3000/api/chat/history", {
-      method: "DELETE",
-      headers: { "Authorization": "Bearer " + token }
+    const data = await apiRequest("http://localhost:3000/api/chat/history", {
+      method: "DELETE"
     });
     
-    const data = await res.json();
+    const responseBox = document.getElementById("qaResponse");
+    if (responseBox) responseBox.innerHTML = '<div class="system-msg">對話歷史已清除</div>';
     
-    if(res.ok) {
-      // 清空前端顯示
-      const responseBox = document.getElementById("qaResponse");
-      if(responseBox) responseBox.innerHTML = '<div class="system-msg">對話歷史已清除</div>';
-      
-      // 清空記憶體
-      window.userHistories = [];
-      
-      alert(data.message || "對話歷史已清除");
-    } else {
-      alert("清除失敗：" + (data.error || "未知錯誤"));
-    }
-  } catch(err) {
+    window.userHistories = [];
+    
+    alert(data.message || "對話歷史已清除");
+  } catch (err) {
     console.error("清除對話歷史失敗：", err);
     alert("清除失敗，請稍後再試");
   }
 }
 
-// ---- Chat ----
+// Chat
 document.getElementById("askBtn")?.addEventListener("click", async () => {
+  if (!memory.token) return alert("請先登入");
+  
   const input = document.getElementById("qaInput");
   const responseBox = document.getElementById("qaResponse");
-  if(!input || !responseBox) return;
+  if (!input || !responseBox) return;
   
   const message = input.value.trim();
   if (!message) return;
@@ -707,20 +692,13 @@ document.getElementById("askBtn")?.addEventListener("click", async () => {
   responseBox.appendChild(aiDiv);
 
   try {
-    const token = memory.token;
-    const historyText = (window.userHistories || []).map(m =>
-      `${m.role === "user" ? "User" : "AI"}: ${m.content}`
-    ).join("\n");
-
-    window.userHistories.push({ role: "user", content: message });
-
     const res = await fetch("http://localhost:3000/api/chat", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + token
+        "Authorization": "Bearer " + memory.token
       },
-      body: JSON.stringify({ message, history: historyText })
+      body: JSON.stringify({ message })
     });
 
     aiDiv.innerHTML = "AI：";
@@ -742,6 +720,7 @@ document.getElementById("askBtn")?.addEventListener("click", async () => {
       aiReply += chunkText;
     }
 
+    window.userHistories.push({ role: "user", content: message });
     window.userHistories.push({ role: "assistant", content: aiReply });
     responseBox.scrollTop = responseBox.scrollHeight;
 
@@ -752,72 +731,23 @@ document.getElementById("askBtn")?.addEventListener("click", async () => {
   input.value = "";
 });
 
-// ---- 初始化 ----
-window.addEventListener('load', async ()=>{
-  const token = memory.token;
-
-  if(token){
-    const email = await verifyToken(token);
-    if(email){
-      document.getElementById('loginHint').textContent = '已登入';
-      unlockPanels();
-      loadProfile();
-      loadGoals();
-      loadDietLogs();
-      loadHabits();
-      loadChatHistory();
-    } else {
-      memory.token = null;
-      document.getElementById('loginHint').textContent = '請重新登入';
-    }
+// ==================== 初始化 ====================
+window.addEventListener('load', async () => {
+  console.log('🚀 頁面載入完成，檢查登入狀態...');
+  
+  // 檢查是否有 token (頁面重新整理時)
+  if (memory.token) {
+    console.log('✅ 發現已登入，載入資料...');
+    unlockPanels();
+    
+    await Promise.all([
+      loadProfile(),
+      loadGoals(),
+      loadDietLogs(),
+      loadHabits(),
+      loadChatHistory()
+    ]);
+  } else {
+    console.log('⚠️ 未登入');
   }
-});
-
-const form = document.getElementById('foodForm');
-const foodList = document.getElementById('foodList');
-
-document.getElementById("addFood").addEventListener("click", async (e) => {
-  e.preventDefault();
-
-  const data = {
-    foodname: form.foodname.value,
-    portion_size_per_day: form.portion.value,
-    cal_per_100g: form.cal.value,
-    carbon_per_100g: form.carbon.value,
-    protein_per_100g: form.protein.value,
-    fats_per_100g: form.fats.value,
-    flavor: form.flavor.value,
-    category: form.category.value,
-    description: form.desc.value
-  };
-
-  const res = await fetch('/foods', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-
-  const msg = await res.text();
-  alert(msg);
-  form.reset();
-  loadFoods();
-});
-
-async function loadFoods() {
-  const res = await fetch('/foods');
-  const foods = await res.json();
-  foodList.innerHTML = foods
-    .map(f => `
-      <p>
-        <b>${f.name}</b> (${f.category}) - ${f.cal_per_100g} kcal/100g<br>
-        Flavor: ${f.flavor}, Carbon: ${f.carbon_per_100g}, Protein: ${f.protein_per_100g}, Fat: ${f.fats_per_100g}<br>
-        Portion: ${f.portion_size_per_day}<br>
-        Description: ${f.description}
-      </p>
-    `)
-    .join('');
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  loadFoods();
 });

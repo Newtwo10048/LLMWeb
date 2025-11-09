@@ -25,11 +25,11 @@
       <button class="tab" data-panel="qaPanel">AI 問答</button>
       <button class="tab" data-panel="nutrientPanel">營養素查詢</button>
       <button class="tab" data-panel="foodPanel">食物資料庫</button>
+      <button class="tab" data-panel="recipePanel">食譜營養分析</button>
     </nav>
 
     <section class="panel">
 
-      <!-- 登入 -->
       <div id="loginPanel" class="panelCard">
         <div class="card">
           <h3>登入</h3>
@@ -39,12 +39,24 @@
             <button type="submit">登入</button>
           </form>
           <p id="loginHint" class="muted"></p>
+          
+          <!-- Google 登入 -->
+          <div style="margin-top: 20px; text-align: center;">
+            <p style="color: #666; margin-bottom: 10px;">或使用</p>
             <div id="g_id_onload"
-              data-client_id="1012981023049-l4nvkheq3s0ql1hokvn4uofsl2h4pr5r.apps.googleusercontent.com"
-              data-login_uri="http://localhost:3000/api/google-login"
+              data-client_id="1012981023049-ei8qt2b4qp2n8o0uulpku50tb4cgv4ot.apps.googleusercontent.com"
+              data-callback="handleGoogleLogin"
               data-auto_prompt="false">
             </div>
-          <div class="g_id_signin" data-type="standard"></div>
+            <div class="g_id_signin" 
+              data-type="standard"
+              data-shape="rectangular"
+              data-theme="outline"
+              data-text="signin_with"
+              data-size="large"
+              data-locale="zh_TW">
+            </div>
+          </div>
         </div>
       </div>
       <!-- 註冊 -->
@@ -265,7 +277,7 @@
           <div id="nutrientResult" class="muted"></div>
         </div>
       </div>
-      <!-- food table-->>
+      <!-- food table-->
       <div id="foodPanel" class="panelCard" style="display:none">
         <div class="card">
           <h3>食物輸入</h3>
@@ -281,9 +293,163 @@
               <textarea placeholder="Description" id="desc"></textarea><br>
               <button id="addFood" type="button">Add Food</button>
             </form>
-            <div class="log-list" id="foods"></div>
+            <div class="foodList" id="foods"></div>
+            <div id="foodList"></div>
         </div>
       </div>
+      <!-- recipe table-->
+      <div id="recipePanel" class="panelCard" style="display:none">
+        <div class="card">
+            <div class="container">
+                <!-- 標題區 -->
+                  <div class="header-content">
+                      <svg class="icon-chef" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
+                          <line x1="6" y1="17" x2="18" y2="17"/>
+                      </svg>
+                      <div>
+                          <h1>食譜營養分析系統</h1>
+                          <p class="subtitle">輸入食譜，自動分析營養成分並儲存到資料庫</p>
+                      </div>
+                  </div>
+
+                <!-- 分頁標籤 -->
+                <div class="tabs">
+                    <button class="tab-button active" data-tab="input">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
+                        </svg>
+                        輸入食譜
+                    </button>
+                    <button class="tab-button" data-tab="list">
+                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"/>
+                            <line x1="8" y1="12" x2="21" y2="12"/>
+                            <line x1="8" y1="18" x2="21" y2="18"/>
+                            <line x1="3" y1="6" x2="3.01" y2="6"/>
+                            <line x1="3" y1="12" x2="3.01" y2="12"/>
+                            <line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                        已儲存食譜 <span id="recipe-count">(0)</span>
+                    </button>
+                </div>
+
+                <!-- 輸入食譜分頁 -->
+                <div id="input-tab" class="tab-content active">
+                    <div class="card">
+                        <h2 class="card-title">📝 輸入食譜資訊</h2>
+                        
+                        <div class="form-group">
+                            <label for="recipe-name">食譜名稱</label>
+                            <input type="text" id="recipe-name" placeholder="例如：香煎雞胸肉佐時蔬">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="servings">份量</label>
+                            <div class="servings-input">
+                                <input type="number" id="servings" min="1" value="1">
+                                <span>人份</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="recipe-content">食譜內容（包含食材與作法）</label>
+                            <textarea id="recipe-content" rows="12" placeholder="請輸入食譜內容，例如：
+
+食材：
+雞胸肉 200克
+橄欖油 1匙
+花椰菜 100克
+...
+
+作法：
+1. 雞胸肉醃製...
+2. 熱鍋後..."></textarea>
+                        </div>
+
+                        <button id="analyze-btn" class="btn btn-primary">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                            </svg>
+                            <span id="analyze-text">AI 分析營養成分</span>
+                        </button>
+                    </div>
+
+                    <!-- 營養分析結果 -->
+                    <div id="nutrition-result" class="card hidden">
+                        <h2 class="card-title">🔬 營養成分分析</h2>
+                        
+                        <div class="nutrition-grid" id="nutrition-grid">
+                            <!-- 營養數據會由 JS 動態生成 -->
+                        </div>
+
+                        <div id="ingredients-section" class="ingredients-section hidden">
+                            <h3>識別的食材：</h3>
+                            <div id="ingredients-list" class="ingredients-list"></div>
+                        </div>
+
+                        <button id="save-btn" class="btn btn-success">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            儲存食譜到資料庫
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 已儲存食譜分頁 -->
+                <div id="list-tab" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <svg class="icon-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>
+                            <h2>資料庫中的食譜</h2>
+                        </div>
+
+                        <div id="recipes-list" class="recipes-list">
+                            <div class="empty-state">
+                                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                                </svg>
+                                <p>尚未儲存任何食譜</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 食譜詳情彈窗 -->
+    <div id="recipe-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-recipe-name"></h2>
+                <button id="close-modal" class="close-btn">✕</button>
+            </div>
+            
+            <div id="modal-recipe-info" class="modal-info"></div>
+            
+            <div class="nutrition-grid" id="modal-nutrition-grid"></div>
+            
+            <div class="modal-section">
+                <h3>食譜內容：</h3>
+                <div id="modal-recipe-content" class="recipe-content"></div>
+            </div>
+
+            <div id="modal-ingredients-section" class="modal-section hidden">
+                <h3>識別的食材：</h3>
+                <div id="modal-ingredients-list" class="ingredients-list"></div>
+            </div>
+        </div>
+    </div>
     </section>
   </div>
   <script src="script.js"></script>
