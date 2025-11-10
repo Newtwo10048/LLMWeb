@@ -1,44 +1,47 @@
 // backend/server.js
+
+// ==================== 匯入套件 ====================
 import express from "express";
 import bodyParser from "body-parser";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import mysql from "mysql2/promise"; // ✅ 使用 promise 版本
-import cors from "cors";
+import bcrypt from "bcryptjs";          // 密碼加密
+import jwt from "jsonwebtoken";         // JWT Token 生成與驗證
+import mysql from "mysql2/promise";     // MySQL 資料庫 (Promise 版本)
+import cors from "cors";                // 跨域請求處理
 import path from "path";
-import { spawn } from "child_process";
+import { spawn } from "child_process";  // 執行 Ollama AI
 import { fileURLToPath } from "url";
-import { OAuth2Client } from "google-auth-library";
+import { OAuth2Client } from "google-auth-library"; // Google 登入驗證
 
-const PORT = 3000; // ✅ 改用 3001（如果 3000 被佔用）
-const JWT_SECRET = process.env.JWT_SECRET || "超級秘密金鑰";
+// ==================== 環境變數與常數 ====================
+const PORT = 3000;
+const JWT_SECRET = process.env.JWT_SECRET || "超級秘密金鑰"; // JWT 簽章密鑰
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "1012981023049-ei8qt2b4qp2n8o0uulpku50tb4cgv4ot.apps.googleusercontent.com";
 
 const app = express();
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// Middleware
-app.use(bodyParser.json());
-app.use(cors());
-app.use(express.static('public'));
+// ==================== Middleware 設定 ====================
+app.use(bodyParser.json());  // 解析 JSON 請求
+app.use(cors());             // 允許跨域請求
+app.use(express.static('public')); // 提供靜態檔案
 
-// 設定靜態檔案
+// 設定靜態檔案路徑
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ MySQL 連線池 (Promise 版本)
+// ==================== MySQL 連線池 ====================
 const db = mysql.createPool({
   host: 'localhost',
   user: 'root',
   password: 'mysql1234',
   database: 'userdb',
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  connectionLimit: 10,  // 最多 10 個連線
+  queueLimit: 0         // 無限排隊
 });
 
-// ✅ 測試連線 (Promise 版本)
+// ==================== 測試資料庫連線 ====================
 (async () => {
   try {
     const connection = await db.getConnection();
@@ -51,7 +54,11 @@ const db = mysql.createPool({
 
 // ==================== 輔助函數 ====================
 
-// 驗證 Google Token
+/**
+ * 驗證 Google ID Token
+ * @param {string} token - Google ID Token
+ * @returns {Promise<object>} Google 使用者資訊 (email, name, picture 等)
+ */
 async function verifyGoogleToken(token) {
   try {
     const ticket = await client.verifyIdToken({
@@ -65,7 +72,10 @@ async function verifyGoogleToken(token) {
   }
 }
 
-// 建立預設 Profile
+/**
+ * 為新使用者建立預設 Profile
+ * @param {number} userId - 使用者 ID
+ */
 async function createDefaultProfile(userId) {
   try {
     const sql = `
@@ -79,24 +89,30 @@ async function createDefaultProfile(userId) {
   }
 }
 
-// ==================== 一般註冊 ====================
-
+// ==================== 一般註冊 API ====================
+/**
+ * POST /api/register
+ * 註冊新使用者 (Email + Password)
+ */
 app.post("/api/register", async (req, res) => {
   console.log('📥 收到註冊請求:', { email: req.body.email, hasPassword: !!req.body.password });
   
   const { email, password } = req.body;
   
+  // 驗證：檢查必填欄位
   if (!email || !password) {
     console.warn('⚠️ 註冊失敗: 欄位為空');
     return res.status(400).json({ message: "請填寫所有欄位" });
   }
   
+  // 驗證：Email 格式
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     console.warn('⚠️ 註冊失敗: Email 格式錯誤');
     return res.status(400).json({ message: "Email 格式不正確" });
   }
   
+  // 驗證：密碼長度
   if (password.length < 6) {
     console.warn('⚠️ 註冊失敗: 密碼太短');
     return res.status(400).json({ message: "密碼至少需要 6 個字元" });
@@ -104,8 +120,11 @@ app.post("/api/register", async (req, res) => {
 
   try {
     console.log('✅ 驗證通過，開始加密密碼');
+    
+    // 使用 bcrypt 加密密碼 (10 rounds)
     const hash = bcrypt.hashSync(password, 10);
     
+    // 檢查 Email 是否已被註冊
     const [existingUsers] = await db.query(
       "SELECT id, provider FROM users WHERE email = ?",
       [email]
@@ -113,18 +132,22 @@ app.post("/api/register", async (req, res) => {
     
     if (existingUsers.length > 0) {
       const existingUser = existingUsers[0];
+      
+      // 如果已用 Google 註冊，提示使用者
       if (existingUser.provider === 'google') {
         console.warn('⚠️ 註冊失敗: Email 已被 Google 帳號使用');
         return res.status(409).json({ 
           message: "此 Email 已使用 Google 登入註冊，請直接使用 Google 登入" 
         });
       }
+      
       console.warn('⚠️ 註冊失敗: Email 已存在');
       return res.status(409).json({ 
         message: "此 Email 已被註冊，請使用其他 Email" 
       });
     }
 
+    // 建立新使用者
     const [result] = await db.query(
       "INSERT INTO users (email, password, provider) VALUES (?, ?, 'local')",
       [email, hash]
@@ -133,6 +156,7 @@ app.post("/api/register", async (req, res) => {
     const userId = result.insertId;
     console.log('✅ 使用者已建立, ID:', userId);
     
+    // 為新使用者建立預設 profile
     await createDefaultProfile(userId);
     
     console.log('🎉 註冊流程完成');
@@ -145,6 +169,7 @@ app.post("/api/register", async (req, res) => {
   } catch (err) {
     console.error('❌ 註冊錯誤:', err);
     
+    // 處理資料庫重複鍵錯誤
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ 
         message: "此 Email 已被註冊，請使用其他 Email" 
@@ -155,18 +180,23 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// ==================== 一般登入 ====================
-
+// ==================== 一般登入 API ====================
+/**
+ * POST /api/login
+ * 使用 Email + Password 登入
+ */
 app.post("/api/login", async (req, res) => {
   console.log('📥 收到登入請求:', { email: req.body.email });
   
   const { email, password } = req.body;
   
+  // 驗證：檢查必填欄位
   if (!email || !password) {
     return res.status(400).json({ message: "請填寫所有欄位" });
   }
 
   try {
+    // 查詢使用者
     const [results] = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
@@ -179,6 +209,7 @@ app.post("/api/login", async (req, res) => {
 
     const user = results[0];
 
+    // 檢查是否為 Google 帳號 (沒有設定密碼)
     if (user.provider === 'google' && !user.password) {
       console.warn('⚠️ 登入失敗: 此帳號使用 Google 登入');
       return res.status(401).json({ 
@@ -186,12 +217,14 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
+    // 驗證密碼
     const match = bcrypt.compareSync(password, user.password);
     if (!match) {
       console.warn('⚠️ 登入失敗: 密碼錯誤');
       return res.status(401).json({ message: "帳號或密碼錯誤" });
     }
 
+    // 生成 JWT Token (有效期 7 天)
     const token = jwt.sign(
       { id: user.id, email: user.email },
       JWT_SECRET,
@@ -215,26 +248,31 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ==================== Google 登入 ====================
-
+// ==================== Google 登入 API ====================
+/**
+ * POST /api/google-login
+ * 使用 Google One Tap 登入
+ */
 app.post("/api/google-login", async (req, res) => {
   console.log('📥 收到 Google 登入請求');
   
-  const { credential } = req.body; // ✅ 修正：使用 credential 而非 id_token
+  const { credential } = req.body;
 
   if (!credential) {
     return res.status(400).json({ message: "缺少 Google token" });
   }
 
   try {
+    // 驗證 Google Token
     const payload = await verifyGoogleToken(credential);
     const email = payload.email;
-    const googleId = payload.sub;
+    const googleId = payload.sub;        // Google 使用者 ID
     const name = payload.name;
     const picture = payload.picture;
 
     console.log('✅ Google token 驗證成功:', { email, name });
 
+    // 檢查使用者是否已存在
     const [existingUsers] = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
@@ -244,6 +282,7 @@ app.post("/api/google-login", async (req, res) => {
     let isNewUser = false;
 
     if (existingUsers.length === 0) {
+      // 新使用者 - 建立帳號
       console.log('📝 建立新 Google 使用者');
       
       const [result] = await db.query(
@@ -261,14 +300,17 @@ app.post("/api/google-login", async (req, res) => {
         avatar_url: picture
       };
 
+      // 建立預設 profile
       await createDefaultProfile(userId);
       
       isNewUser = true;
       console.log('✅ 新使用者已建立, ID:', userId);
 
     } else {
+      // 現有使用者 - 直接登入
       user = existingUsers[0];
       
+      // 如果是 local 帳號，綁定 Google ID
       if (user.provider === 'local' && !user.google_id) {
         console.log('🔗 綁定 Google 到現有帳號');
         
@@ -285,6 +327,7 @@ app.post("/api/google-login", async (req, res) => {
       console.log('✅ 現有使用者登入, ID:', user.id);
     }
 
+    // 生成 JWT Token
     const token = jwt.sign(
       { id: user.id, email: user.email },
       JWT_SECRET,
@@ -315,10 +358,13 @@ app.post("/api/google-login", async (req, res) => {
 });
 
 // ==================== JWT 驗證中介層 ====================
-
+/**
+ * 驗證 JWT Token 的中介層函數
+ * 用於保護需要登入才能存取的 API
+ */
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && authHeader.split(' ')[1]; // 格式: "Bearer <token>"
 
   if (!token) {
     return res.status(401).json({ message: "未提供 token" });
@@ -328,34 +374,54 @@ function authenticateToken(req, res, next) {
     if (err) {
       return res.status(403).json({ message: "Token 無效或已過期" });
     }
-    req.user = user;
+    req.user = user; // 將解碼後的使用者資訊附加到 req
     next();
   });
 }
 
-// ==================== Profile API ====================
+// ==================== Profile API (個人資料) ====================
 
+/**
+ * GET /api/profile
+ * 取得個人資料
+ */
 app.get("/api/profile", authenticateToken, async (req, res) => {
   const userId = req.user.id;
+  
   try {
     const [results] = await db.query(
       "SELECT name, birthday, height, weight, sportType, gender, notes FROM profiles WHERE user_id=?",
       [userId]
     );
     
+    // 如果沒有 profile，回傳預設值
     if (results.length === 0) {
-      return res.json({ name:'', birthday:'', height:'', weight:'', sportType:'general', gender:'male', notes:'' });
+      return res.json({ 
+        name:'', 
+        birthday:'', 
+        height:'', 
+        weight:'', 
+        sportType:'general', 
+        gender:'male', 
+        notes:'' 
+      });
     }
+    
     res.json(results[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+/**
+ * POST /api/profile
+ * 新增或更新個人資料
+ */
 app.post("/api/profile", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const { name, birthday, height, weight, sportType, gender, notes } = req.body;
 
+  // 整理資料 (處理空值)
   const profileData = {
     name: name || '',
     birthday: birthday || null,
@@ -367,9 +433,11 @@ app.post("/api/profile", authenticateToken, async (req, res) => {
   };
 
   try {
+    // 檢查是否已有 profile
     const [results] = await db.query("SELECT * FROM profiles WHERE user_id=?", [userId]);
 
     if (results.length === 0) {
+      // 新增
       const sql = `
         INSERT INTO profiles (user_id, name, birthday, height, weight, sportType, gender, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -377,6 +445,7 @@ app.post("/api/profile", authenticateToken, async (req, res) => {
       await db.query(sql, [userId, ...Object.values(profileData)]);
       res.json({ message: "已新增 profile", profile: { user_id: userId, ...profileData } });
     } else {
+      // 更新
       const sql = "UPDATE profiles SET name=?, birthday=?, height=?, weight=?, sportType=?, gender=?, notes=? WHERE user_id=?";
       await db.query(sql, [...Object.values(profileData), userId]);
       res.json({ message: "已更新 profile", profile: { user_id: userId, ...profileData } });
@@ -386,8 +455,12 @@ app.post("/api/profile", authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== Goals API ====================
+// ==================== Goals API (目標設定) ====================
 
+/**
+ * POST /api/goals
+ * 新增或更新目標
+ */
 app.post("/api/goals", authenticateToken, async (req, res) => {
   const { short_goal, long_goal } = req.body;
   const userId = req.user.id;
@@ -396,12 +469,14 @@ app.post("/api/goals", authenticateToken, async (req, res) => {
     const [results] = await db.query("SELECT * FROM goals WHERE user_id=?", [userId]);
 
     if (results.length === 0) {
+      // 新增
       await db.query(
         "INSERT INTO goals (user_id, short_goal, long_goal) VALUES (?, ?, ?)",
         [userId, short_goal || '', long_goal || '']
       );
       res.json({ message: "目標已新增" });
     } else {
+      // 更新
       await db.query(
         "UPDATE goals SET short_goal=?, long_goal=? WHERE user_id=?",
         [short_goal || '', long_goal || '', userId]
@@ -413,6 +488,10 @@ app.post("/api/goals", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/goals
+ * 取得目標設定
+ */
 app.get("/api/goals", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -420,19 +499,26 @@ app.get("/api/goals", authenticateToken, async (req, res) => {
       [req.user.id]
     );
     
+    // 如果沒有設定，回傳空字串
     if (rows.length === 0) {
       return res.json({ short_goal: '', long_goal: '' });
     }
+    
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== Diet Logs API ====================
+// ==================== Diet Logs API (飲食記錄) ====================
 
+/**
+ * POST /api/diet
+ * 新增飲食記錄
+ */
 app.post("/api/diet", authenticateToken, async (req, res) => {
   const { food_name, grams } = req.body;
+  
   try {
     await db.query(
       "INSERT INTO diet_logs (user_id, food_name, grams) VALUES (?, ?, ?)",
@@ -444,6 +530,10 @@ app.post("/api/diet", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/diet/logs
+ * 取得飲食記錄列表 (最新在前)
+ */
 app.get("/api/diet/logs", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -456,16 +546,20 @@ app.get("/api/diet/logs", authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== Habits API ====================
+// ==================== Habits API (運動習慣) ====================
 
+/**
+ * POST /api/habits
+ * 新增或更新運動習慣
+ */
 app.post("/api/habits", authenticateToken, async (req, res) => {
   const {
-    freq_per_week,
-    duration_min,
-    meal_breakfast,
-    meal_lunch,
-    meal_dinner,
-    meal_late
+    freq_per_week,    // 每週運動頻率
+    duration_min,     // 每次運動時長 (分鐘)
+    meal_breakfast,   // 是否吃早餐
+    meal_lunch,       // 是否吃午餐
+    meal_dinner,      // 是否吃晚餐
+    meal_late         // 是否吃宵夜
   } = req.body;
   const userId = req.user.id;
 
@@ -473,6 +567,7 @@ app.post("/api/habits", authenticateToken, async (req, res) => {
     const [results] = await db.query("SELECT * FROM habits WHERE user_id=?", [userId]);
 
     if (results.length === 0) {
+      // 新增
       await db.query(
         `INSERT INTO habits 
          (user_id, freq_per_week, duration_min, meal_breakfast, meal_lunch, meal_dinner, meal_late)
@@ -481,6 +576,7 @@ app.post("/api/habits", authenticateToken, async (req, res) => {
       );
       res.json({ message: "習慣已新增" });
     } else {
+      // 更新
       await db.query(
         `UPDATE habits 
          SET freq_per_week=?, duration_min=?, meal_breakfast=?, meal_lunch=?, meal_dinner=?, meal_late=?
@@ -494,6 +590,10 @@ app.post("/api/habits", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/habits
+ * 取得運動習慣
+ */
 app.get("/api/habits", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -501,6 +601,7 @@ app.get("/api/habits", authenticateToken, async (req, res) => {
       [req.user.id]
     );
     
+    // 如果沒有設定，回傳預設值
     if (rows.length === 0) {
       return res.json({
         freq_per_week: 0,
@@ -511,14 +612,19 @@ app.get("/api/habits", authenticateToken, async (req, res) => {
         meal_late: false
       });
     }
+    
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== Chat API ====================
+// ==================== Chat API (AI 對話) ====================
 
+/**
+ * GET /api/chat/history
+ * 取得對話歷史
+ */
 app.get("/api/chat/history", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -531,6 +637,10 @@ app.get("/api/chat/history", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/chat/history
+ * 清除對話歷史
+ */
 app.delete("/api/chat/history", authenticateToken, async (req, res) => {
   try {
     const [result] = await db.query(
@@ -546,6 +656,11 @@ app.delete("/api/chat/history", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/chat
+ * 與 AI 對話 (使用 Ollama Llama3)
+ * 回應格式：串流 (Stream)
+ */
 app.post("/api/chat", authenticateToken, async (req, res) => {
   const { message } = req.body;
   const userId = req.user.id;
@@ -553,7 +668,7 @@ app.post("/api/chat", authenticateToken, async (req, res) => {
   if (!message) return res.status(400).json({ reply: "訊息不得為空" });
 
   try {
-    // 儲存使用者訊息
+    // 儲存使用者訊息到資料庫
     await db.query(
       "INSERT INTO chat_logs (user_id, role, content) VALUES (?, 'user', ?)",
       [userId, message]
@@ -565,24 +680,29 @@ app.post("/api/chat", authenticateToken, async (req, res) => {
       [userId]
     );
 
+    // 啟動 Ollama Llama3 (本地 AI 模型)
     const llm = spawn("ollama", ["run", "llama3"]);
 
-    let reply = "";
+    let reply = ""; // 完整 AI 回覆
     llm.stdout.setEncoding("utf8");
 
+    // 設定回應為純文字串流
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
+    // 即時傳送 AI 回應 (串流)
     llm.stdout.on("data", chunk => {
       reply += chunk;
-      res.write(chunk);
+      res.write(chunk); // 立即傳送到前端
     });
 
+    // 處理 Ollama 錯誤
     llm.stderr.on("data", chunk => console.error("Ollama error:", chunk));
 
+    // AI 回應完成
     llm.on("close", async () => {
       const replyText = reply.trim();
       
-      // 儲存 AI 回覆
+      // 儲存 AI 回覆到資料庫
       try {
         await db.query(
           "INSERT INTO chat_logs (user_id, role, content) VALUES (?, 'assistant', ?)",
@@ -592,26 +712,32 @@ app.post("/api/chat", authenticateToken, async (req, res) => {
         console.error("儲存 AI 回覆失敗：", err);
       }
 
-      res.end();
+      res.end(); // 結束串流
     });
 
-    // 建立對話 prompt
+    // 建立對話 prompt (包含歷史)
     const systemPrompt = "請一定完全以繁體中文回覆我：\n";
     const historyText = history
       .map(m => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
       .join("\n");
     const prompt = systemPrompt + historyText + "\nAI:";
 
+    // 傳送 prompt 給 AI
     llm.stdin.write(prompt);
     llm.stdin.end();
+    
   } catch (err) {
     console.error("Chat error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== Foods API ====================
+// ==================== Foods API (食物資料庫) ====================
 
+/**
+ * POST /api/foods
+ * 新增食物資料
+ */
 app.post("/api/foods", async (req, res) => {
   const {
     foodname,
@@ -625,6 +751,7 @@ app.post("/api/foods", async (req, res) => {
     description
   } = req.body;
 
+  // 輔助函數：將空字串轉為 null
   const parseNumber = (value) => value === "" ? null : parseFloat(value);
 
   const sql = `
@@ -652,6 +779,10 @@ app.post("/api/foods", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/foods
+ * 取得所有食物資料
+ */
 app.get("/api/foods", async (req, res) => {
   try {
     const [results] = await db.query("SELECT * FROM foods");
@@ -661,8 +792,12 @@ app.get("/api/foods", async (req, res) => {
   }
 });
 
-// ==================== Recipes API (簡化版) ====================
+// ==================== Recipes API (食譜管理) ====================
 
+/**
+ * GET /api/recipes
+ * 取得使用者的食譜列表
+ */
 app.get("/api/recipes", authenticateToken, async (req, res) => {
   try {
     const [recipes] = await db.query(
@@ -675,6 +810,10 @@ app.get("/api/recipes", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/recipes
+ * 新增食譜
+ */
 app.post("/api/recipes", authenticateToken, async (req, res) => {
   const { name, content, servings, nutrition } = req.body;
   const userId = req.user.id;
@@ -696,8 +835,13 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/recipes/:id
+ * 刪除食譜
+ */
 app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
   const recipeId = req.params.id;
+  
   try {
     await db.query(
       "DELETE FROM recipes WHERE id=? AND user_id=?",
@@ -709,12 +853,11 @@ app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== 靜態檔案 ====================
-
+// ==================== 靜態檔案服務 ====================
+// 提供前端 HTML/CSS/JS 檔案
 app.use('/', express.static(path.join(__dirname, '..', 'frontend')));
 
 // ==================== 啟動伺服器 ====================
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
