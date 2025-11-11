@@ -12,6 +12,9 @@ node server.js
 cd C:\Program Files\MySQL\MySQL Server 9.4\bin
 mysql -u root -p
 
+這裡需要設定mysql的密碼，server.js檔裡的密碼也要跟著換
+
+
 安裝llama3(這個是llm)
 $ollama pull llama3
 
