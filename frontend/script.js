@@ -904,3 +904,312 @@ window.addEventListener('load', async () => {
     console.log('⚠️ 未登入');
   }
 });
+
+// ==================== 全域變數 ====================
+let currentAnalysisResult = null;
+
+// 從主應用取得 token
+function getToken() {
+  // 如果有主應用的 memory 物件
+  if (typeof memory !== 'undefined' && memory.token) {
+    return memory.token;
+  }
+  // 否則從 localStorage 取得（備用方案，實際應避免）
+  return localStorage.getItem('token');
+}
+
+// ==================== 分析食譜 ====================
+async function analyzeRecipe() {
+  const recipeName = document.getElementById('recipeName').value.trim();
+  const recipeContent = document.getElementById('recipeContent').value.trim();
+
+  if (!recipeName) {
+    alert('請輸入食譜名稱');
+    return;
+  }
+
+  if (!recipeContent) {
+    alert('請輸入食譜內容');
+    return;
+  }
+
+  const token = getToken();
+  if (!token) {
+    alert('請先登入');
+    return;
+  }
+
+  // 顯示載入動畫
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('loadingSection').style.display = 'block';
+  document.getElementById('resultSection').classList.remove('show');
+
+  const aiResponseEl = document.getElementById('aiResponse');
+  aiResponseEl.textContent = '';
+
+  try {
+    const response = await fetch('http://localhost:3000/api/recipes/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ recipeContent })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // 使用 Server-Sent Events 接收串流資料
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      
+      // 處理多個 SSE 訊息
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop(); // 保留未完成的訊息
+
+      for (const message of messages) {
+        if (message.startsWith('data: ')) {
+          const data = JSON.parse(message.substring(6));
+          
+          if (data.chunk) {
+            // 顯示 AI 即時回應
+            aiResponseEl.textContent += data.chunk;
+          } else if (data.done) {
+            // 分析完成
+            currentAnalysisResult = data.result;
+            displayResult(data.result);
+            break;
+          }
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error('分析失敗:', error);
+    alert('分析失敗：' + error.message);
+  } finally {
+    document.getElementById('analyzeBtn').disabled = false;
+    document.getElementById('loadingSection').style.display = 'none';
+  }
+}
+
+// ==================== 顯示分析結果 ====================
+function displayResult(result) {
+  console.log('分析結果:', result);
+
+  // 顯示營養成分
+  const nutritionGrid = document.getElementById('nutritionGrid');
+  nutritionGrid.innerHTML = `
+    <div class="nutrition-card">
+      <div class="nutrition-label">熱量</div>
+      <div class="nutrition-value">${result.nutrition.calories || 0}</div>
+      <div class="nutrition-unit">大卡</div>
+    </div>
+    <div class="nutrition-card">
+      <div class="nutrition-label">蛋白質</div>
+      <div class="nutrition-value">${result.nutrition.protein || 0}</div>
+      <div class="nutrition-unit">公克</div>
+    </div>
+    <div class="nutrition-card">
+      <div class="nutrition-label">碳水化合物</div>
+      <div class="nutrition-value">${result.nutrition.carbs || 0}</div>
+      <div class="nutrition-unit">公克</div>
+    </div>
+    <div class="nutrition-card">
+      <div class="nutrition-label">脂肪</div>
+      <div class="nutrition-value">${result.nutrition.fat || 0}</div>
+      <div class="nutrition-unit">公克</div>
+    </div>
+    <div class="nutrition-card">
+      <div class="nutrition-label">膳食纖維</div>
+      <div class="nutrition-value">${result.nutrition.fiber || 0}</div>
+      <div class="nutrition-unit">公克</div>
+    </div>
+  `;
+
+  // 顯示食材清單
+  const ingredientsList = document.getElementById('ingredientsList');
+  if (result.ingredients && result.ingredients.length > 0) {
+    ingredientsList.innerHTML = result.ingredients
+      .map(ing => `
+        <div class="ingredient-item">
+          <strong>${ing.name}</strong>: ${ing.amount}
+        </div>
+      `)
+      .join('');
+  } else {
+    ingredientsList.innerHTML = '<p style="color: #999;">未偵測到食材清單</p>';
+  }
+
+  // 顯示食譜內容
+  const recipeText = document.getElementById('recipeText');
+  recipeText.textContent = result.recipe || document.getElementById('recipeContent').value;
+
+  // 顯示結果區域
+  document.getElementById('resultSection').classList.add('show');
+}
+
+// ==================== 儲存食譜 ====================
+async function saveRecipe() {
+  if (!currentAnalysisResult) {
+    alert('請先分析食譜');
+    return;
+  }
+
+  const recipeName = document.getElementById('recipeName').value.trim();
+  const recipeContent = document.getElementById('recipeContent').value.trim();
+  const servings = parseInt(document.getElementById('servings').value) || 1;
+
+  const token = getToken();
+  if (!token) {
+    alert('請先登入');
+    return;
+  }
+
+  try {
+    const response = await fetch('http://localhost:3000/api/recipes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        recipeName,
+        recipeContent,
+        servings,
+        nutrition: currentAnalysisResult.nutrition,
+        ingredients: currentAnalysisResult.ingredients,
+        recipe: currentAnalysisResult.recipe
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      alert('✅ 食譜儲存成功！');
+      clearForm();
+      loadRecipes(); // 重新載入食譜列表
+    } else {
+      throw new Error(data.error || '儲存失敗');
+    }
+
+  } catch (error) {
+    console.error('儲存失敗:', error);
+    alert('儲存失敗：' + error.message);
+  }
+}
+
+// ==================== 載入食譜列表 ====================
+async function loadRecipes() {
+  const token = getToken();
+  if (!token) {
+    document.getElementById('recipeList').innerHTML = '<p style="color: #999;">請先登入以查看食譜</p>';
+    return;
+  }
+
+  try {
+    const response = await fetch('http://localhost:3000/api/recipes', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const recipes = await response.json();
+    const recipeList = document.getElementById('recipeList');
+
+    if (recipes.length === 0) {
+      recipeList.innerHTML = '<p style="color: #999;">尚未建立任何食譜</p>';
+      return;
+    }
+
+    recipeList.innerHTML = recipes.map(recipe => `
+      <div class="recipe-item" onclick="viewRecipe(${recipe.id})">
+        <div class="recipe-item-header">
+          <div class="recipe-item-title">${recipe.recipe_name}</div>
+          <div class="recipe-item-date">${new Date(recipe.created_at).toLocaleDateString('zh-TW')}</div>
+        </div>
+        <div class="recipe-item-nutrition">
+          <span>🔥 ${recipe.calories || 0} 大卡</span>
+          <span>🥩 蛋白質 ${recipe.protein || 0}g</span>
+          <span>🌾 碳水 ${recipe.carbs || 0}g</span>
+          <span>🥑 脂肪 ${recipe.fat || 0}g</span>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (error) {
+    console.error('載入食譜失敗:', error);
+  }
+}
+
+// ==================== 查看食譜詳情 ====================
+async function viewRecipe(recipeId) {
+  const token = getToken();
+  if (!token) return;
+
+  try {
+    const response = await fetch(`http://localhost:3000/api/recipes/${recipeId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const recipe = await response.json();
+
+    // 填入表單
+    document.getElementById('recipeName').value = recipe.recipe_name;
+    document.getElementById('servings').value = recipe.servings;
+    document.getElementById('recipeContent').value = recipe.recipe_content;
+
+    // 顯示分析結果
+    currentAnalysisResult = {
+      nutrition: {
+        calories: recipe.calories,
+        protein: recipe.protein,
+        carbs: recipe.carbs,
+        fat: recipe.fat,
+        fiber: recipe.fiber
+      },
+      ingredients: recipe.ingredients || [],
+      recipe: recipe.recipe_content
+    };
+
+    displayResult(currentAnalysisResult);
+
+    // 捲動到頂部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (error) {
+    console.error('載入食譜詳情失敗:', error);
+    alert('載入失敗：' + error.message);
+  }
+}
+
+// ==================== 清除表單 ====================
+function clearForm() {
+  document.getElementById('recipeName').value = '';
+  document.getElementById('servings').value = '1';
+  document.getElementById('recipeContent').value = '';
+  document.getElementById('resultSection').classList.remove('show');
+  currentAnalysisResult = null;
+}
+
+// ==================== 重新分析 ====================
+function analyzeAgain() {
+  document.getElementById('resultSection').classList.remove('show');
+  currentAnalysisResult = null;
+}
+
+// ==================== 頁面載入時執行 ====================
+window.addEventListener('DOMContentLoaded', () => {
+  loadRecipes();
+});

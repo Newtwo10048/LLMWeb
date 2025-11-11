@@ -853,6 +853,304 @@ app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== 食譜分析 API ====================
+// 新增到 server.js 的底部，app.listen() 之前
+
+// 1. 分析食譜（使用 Llama3）
+app.post("/api/recipes/analyze", authenticateToken, async (req, res) => {
+  const { recipeContent } = req.body;
+
+  if (!recipeContent) {
+    return res.status(400).json({ error: "請提供食譜內容" });
+  }
+
+  console.log('📝 收到食譜分析請求');
+
+  try {
+    // 設定 streaming response
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // 建立 AI prompt
+    const prompt = `
+請分析以下食譜的營養成分和食材清單，並以 JSON 格式回覆。
+
+食譜內容：
+${recipeContent}
+
+請回覆以下格式的 JSON（不要有任何其他文字）：
+{
+  "nutrition": {
+    "calories": 總熱量（大卡，數字），
+    "protein": 蛋白質（克，數字），
+    "carbs": 碳水化合物（克，數字），
+    "fat": 脂肪（克，數字），
+    "fiber": 膳食纖維（克，數字）
+  },
+  "ingredients": [
+    {"name": "食材名稱", "amount": "份量"},
+    {"name": "食材名稱", "amount": "份量"}
+  ],
+  "recipe": "完整的食譜步驟說明"
+}
+
+請只回覆 JSON，不要有其他說明文字。
+`;
+
+    // 呼叫 Ollama Llama3
+    const llm = spawn("ollama", ["run", "llama3"]);
+    
+    let fullResponse = "";
+    
+    llm.stdout.setEncoding("utf8");
+    
+    llm.stdout.on("data", (chunk) => {
+      fullResponse += chunk;
+      // 即時傳送給前端
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    });
+
+    llm.stderr.on("data", (chunk) => {
+      console.error("Ollama error:", chunk.toString());
+    });
+
+    llm.on("close", () => {
+      console.log('🤖 AI 分析完成');
+      
+      try {
+        // 嘗試解析 JSON
+        // 移除可能的 markdown 標記
+        let jsonText = fullResponse.trim();
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        
+        const result = JSON.parse(jsonText);
+        
+        // 發送最終結果
+        res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
+        res.end();
+      } catch (parseError) {
+        console.error('❌ JSON 解析失敗:', parseError);
+        console.log('原始回應:', fullResponse);
+        
+        // 如果 JSON 解析失敗，嘗試提取數字
+        const fallbackResult = extractNutritionFromText(fullResponse);
+        res.write(`data: ${JSON.stringify({ done: true, result: fallbackResult, warning: '使用備用解析' })}\n\n`);
+        res.end();
+      }
+    });
+
+    // 寫入 prompt
+    llm.stdin.write(prompt);
+    llm.stdin.end();
+
+  } catch (err) {
+    console.error('❌ 食譜分析失敗:', err);
+    res.status(500).json({ error: "分析失敗：" + err.message });
+  }
+});
+
+// 備用：從文字中提取營養資訊
+function extractNutritionFromText(text) {
+  const extractNumber = (pattern) => {
+    const match = text.match(pattern);
+    return match ? parseFloat(match[1]) : 0;
+  };
+
+  return {
+    nutrition: {
+      calories: extractNumber(/calories?["']?\s*:\s*(\d+\.?\d*)/i) || 
+                extractNumber(/熱量[:：]?\s*(\d+\.?\d*)/i) || 500,
+      protein: extractNumber(/protein["']?\s*:\s*(\d+\.?\d*)/i) || 
+               extractNumber(/蛋白質[:：]?\s*(\d+\.?\d*)/i) || 20,
+      carbs: extractNumber(/carbs?["']?\s*:\s*(\d+\.?\d*)/i) || 
+             extractNumber(/碳水[:：]?\s*(\d+\.?\d*)/i) || 50,
+      fat: extractNumber(/fats?["']?\s*:\s*(\d+\.?\d*)/i) || 
+           extractNumber(/脂肪[:：]?\s*(\d+\.?\d*)/i) || 15,
+      fiber: extractNumber(/fiber["']?\s*:\s*(\d+\.?\d*)/i) || 
+             extractNumber(/纖維[:：]?\s*(\d+\.?\d*)/i) || 5
+    },
+    ingredients: [],
+    recipe: text.substring(0, 500) + "..."
+  };
+}
+
+// 2. 儲存食譜
+app.post("/api/recipes", authenticateToken, async (req, res) => {
+  const { recipeName, recipeContent, servings, nutrition, ingredients, recipe } = req.body;
+  const userId = req.user.id;
+
+  if (!recipeName || !recipeContent) {
+    return res.status(400).json({ error: "請提供食譜名稱和內容" });
+  }
+
+  console.log('💾 儲存食譜:', recipeName);
+
+  try {
+    // 開始交易
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // 1. 插入食譜主資料
+      const [recipeResult] = await connection.query(
+        `INSERT INTO recipes (user_id, recipe_name, recipe_content, servings) 
+         VALUES (?, ?, ?, ?)`,
+        [userId, recipeName, recipe || recipeContent, servings || 1]
+      );
+
+      const recipeId = recipeResult.insertId;
+
+      // 2. 插入營養成分
+      if (nutrition) {
+        await connection.query(
+          `INSERT INTO recipe_nutrition (recipe_id, calories, protein, carbs, fat, fiber)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            recipeId,
+            nutrition.calories || 0,
+            nutrition.protein || 0,
+            nutrition.carbs || 0,
+            nutrition.fat || 0,
+            nutrition.fiber || 0
+          ]
+        );
+      }
+
+      // 3. 插入食材清單
+      if (ingredients && Array.isArray(ingredients)) {
+        for (const ingredient of ingredients) {
+          await connection.query(
+            `INSERT INTO recipe_ingredients (recipe_id, ingredient_name, amount)
+             VALUES (?, ?, ?)`,
+            [recipeId, ingredient.name, ingredient.amount || '適量']
+          );
+        }
+      }
+
+      // 提交交易
+      await connection.commit();
+      connection.release();
+
+      console.log('✅ 食譜已儲存, ID:', recipeId);
+
+      res.json({
+        message: "食譜儲存成功",
+        recipeId,
+        recipeName
+      });
+
+    } catch (err) {
+      await connection.rollback();
+      connection.release();
+      throw err;
+    }
+
+  } catch (err) {
+    console.error('❌ 儲存食譜失敗:', err);
+    res.status(500).json({ error: "儲存失敗：" + err.message });
+  }
+});
+
+// 3. 取得用戶的所有食譜
+app.get("/api/recipes", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const [recipes] = await db.query(
+      `SELECT 
+        r.id,
+        r.recipe_name,
+        r.recipe_content,
+        r.servings,
+        r.created_at,
+        n.calories,
+        n.protein,
+        n.carbs,
+        n.fat,
+        n.fiber
+       FROM recipes r
+       LEFT JOIN recipe_nutrition n ON r.id = n.recipe_id
+       WHERE r.user_id = ?
+       ORDER BY r.created_at DESC`,
+      [userId]
+    );
+
+    res.json(recipes);
+  } catch (err) {
+    console.error('❌ 取得食譜失敗:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. 取得單一食譜詳情（含食材）
+app.get("/api/recipes/:id", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const recipeId = req.params.id;
+
+  try {
+    // 取得食譜基本資料
+    const [recipes] = await db.query(
+      `SELECT 
+        r.*,
+        n.calories,
+        n.protein,
+        n.carbs,
+        n.fat,
+        n.fiber
+       FROM recipes r
+       LEFT JOIN recipe_nutrition n ON r.id = n.recipe_id
+       WHERE r.id = ? AND r.user_id = ?`,
+      [recipeId, userId]
+    );
+
+    if (recipes.length === 0) {
+      return res.status(404).json({ error: "找不到食譜" });
+    }
+
+    const recipe = recipes[0];
+
+    // 取得食材清單
+    const [ingredients] = await db.query(
+      `SELECT ingredient_name, amount 
+       FROM recipe_ingredients 
+       WHERE recipe_id = ?`,
+      [recipeId]
+    );
+
+    recipe.ingredients = ingredients;
+
+    res.json(recipe);
+  } catch (err) {
+    console.error('❌ 取得食譜詳情失敗:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. 刪除食譜
+app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const recipeId = req.params.id;
+
+  try {
+    const [result] = await db.query(
+      `DELETE FROM recipes WHERE id = ? AND user_id = ?`,
+      [recipeId, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "找不到食譜" });
+    }
+
+    console.log('🗑️ 食譜已刪除, ID:', recipeId);
+    res.json({ message: "食譜已刪除" });
+  } catch (err) {
+    console.error('❌ 刪除食譜失敗:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ==================== 靜態檔案服務 ====================
 // 提供前端 HTML/CSS/JS 檔案
 app.use('/', express.static(path.join(__dirname, '..', 'frontend')));

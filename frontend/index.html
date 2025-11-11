@@ -298,156 +298,349 @@
         </div>
       </div>
       <!-- recipe table-->
-      <div id="recipePanel" class="panelCard" style="display:none">
-        <div class="card">
-            <div class="container">
-                <!-- 標題區 -->
-                  <div class="header-content">
-                      <svg class="icon-chef" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
-                          <line x1="6" y1="17" x2="18" y2="17"/>
-                      </svg>
-                      <div>
-                          <h1>食譜營養分析系統</h1>
-                          <p class="subtitle">輸入食譜，自動分析營養成分並儲存到資料庫</p>
-                      </div>
-                  </div>
+      <title>食譜營養分析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-                <!-- 分頁標籤 -->
-                <div class="tabs">
-                    <button class="tab-button active" data-tab="input">
-                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
-                        </svg>
-                        輸入食譜
-                    </button>
-                    <button class="tab-button" data-tab="list">
-                        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="8" y1="6" x2="21" y2="6"/>
-                            <line x1="8" y1="12" x2="21" y2="12"/>
-                            <line x1="8" y1="18" x2="21" y2="18"/>
-                            <line x1="3" y1="6" x2="3.01" y2="6"/>
-                            <line x1="3" y1="12" x2="3.01" y2="12"/>
-                            <line x1="3" y1="18" x2="3.01" y2="18"/>
-                        </svg>
-                        已儲存食譜 <span id="recipe-count">(0)</span>
-                    </button>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .nutrition-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .nutrition-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .nutrition-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .nutrition-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .nutrition-unit {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .ingredients-list {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .ingredient-item {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .ingredient-item:last-child {
+            border-bottom: none;
+        }
+
+        .recipe-text {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .recipe-list {
+            margin-top: 30px;
+        }
+
+        .recipe-item {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .recipe-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .recipe-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .recipe-item-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .recipe-item-date {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .recipe-item-nutrition {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🍳 食譜營養分析系統</h1>
+
+            <!-- 輸入區域 -->
+            <div class="input-section">
+                <div style="margin-bottom: 20px;">
+                    <label for="recipeName">食譜名稱</label>
+                    <input type="text" id="recipeName" placeholder="例如：雞胸肉沙拉">
                 </div>
 
-                <!-- 輸入食譜分頁 -->
-                <div id="input-tab" class="tab-content active">
-                    <div class="card">
-                        <h2 class="card-title">📝 輸入食譜資訊</h2>
-                        
-                        <div class="form-group">
-                            <label for="recipe-name">食譜名稱</label>
-                            <input type="text" id="recipe-name" placeholder="例如：香煎雞胸肉佐時蔬">
-                        </div>
+                <div style="margin-bottom: 20px;">
+                    <label for="servings">份數</label>
+                    <input type="number" id="servings" value="1" min="1">
+                </div>
 
-                        <div class="form-group">
-                            <label for="servings">份量</label>
-                            <div class="servings-input">
-                                <input type="number" id="servings" min="1" value="1">
-                                <span>人份</span>
-                            </div>
-                        </div>
+                <div>
+                    <label for="recipeContent">食譜內容</label>
+                    <textarea 
+                        id="recipeContent" 
+                        placeholder="請輸入完整的食譜內容，包括食材和作法...
 
-                        <div class="form-group">
-                            <label for="recipe-content">食譜內容（包含食材與作法）</label>
-                            <textarea id="recipe-content" rows="12" placeholder="請輸入食譜內容，例如：
-
-食材：
-雞胸肉 200克
-橄欖油 1匙
-花椰菜 100克
-...
+例如：
+雞胸肉 200g
+生菜 100g
+小番茄 50g
+橄欖油 1大匙
+檸檬汁 適量
 
 作法：
-1. 雞胸肉醃製...
-2. 熱鍋後..."></textarea>
-                        </div>
-
-                        <button id="analyze-btn" class="btn btn-primary">
-                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-                            </svg>
-                            <span id="analyze-text">AI 分析營養成分</span>
-                        </button>
-                    </div>
-
-                    <!-- 營養分析結果 -->
-                    <div id="nutrition-result" class="card hidden">
-                        <h2 class="card-title">🔬 營養成分分析</h2>
-                        
-                        <div class="nutrition-grid" id="nutrition-grid">
-                            <!-- 營養數據會由 JS 動態生成 -->
-                        </div>
-
-                        <div id="ingredients-section" class="ingredients-section hidden">
-                            <h3>識別的食材：</h3>
-                            <div id="ingredients-list" class="ingredients-list"></div>
-                        </div>
-
-                        <button id="save-btn" class="btn btn-success">
-                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/>
-                                <polyline points="7 3 7 8 15 8"/>
-                            </svg>
-                            儲存食譜到資料庫
-                        </button>
-                    </div>
+1. 雞胸肉煎熟切片
+2. 生菜洗淨撕成適當大小
+3. 小番茄對半切
+4. 全部混合，淋上橄欖油和檸檬汁"></textarea>
                 </div>
 
-                <!-- 已儲存食譜分頁 -->
-                <div id="list-tab" class="tab-content">
-                    <div class="card">
-                        <div class="card-header">
-                            <svg class="icon-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                            </svg>
-                            <h2>資料庫中的食譜</h2>
-                        </div>
+                <div class="button-group">
+                    <button class="btn-primary" id="analyzeBtn" onclick="analyzeRecipe()">
+                        🤖 AI 分析營養成分
+                    </button>
+                    <button class="btn-secondary" onclick="clearForm()">
+                        清除
+                    </button>
+                </div>
+            </div>
 
-                        <div id="recipes-list" class="recipes-list">
-                            <div class="empty-state">
-                                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                                </svg>
-                                <p>尚未儲存任何食譜</p>
-                            </div>
-                        </div>
-                    </div>
+            <!-- 載入動畫 -->
+            <div id="loadingSection" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>AI 正在分析食譜...</p>
+                <p id="aiResponse" style="margin-top: 15px; color: #999; font-size: 14px;"></p>
+            </div>
+
+            <!-- 分析結果 -->
+            <div id="resultSection" class="result-section">
+                <h2>📊 營養分析結果</h2>
+
+                <div class="nutrition-grid" id="nutritionGrid"></div>
+
+                <h3 style="margin-bottom: 15px;">🥗 食材清單</h3>
+                <div class="ingredients-list" id="ingredientsList"></div>
+
+                <h3 style="margin-bottom: 15px;">📝 食譜步驟</h3>
+                <div class="recipe-text" id="recipeText"></div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="saveRecipe()">
+                        💾 儲存食譜
+                    </button>
+                    <button class="btn-secondary" onclick="analyzeAgain()">
+                        重新分析
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- 食譜詳情彈窗 -->
-    <div id="recipe-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-recipe-name"></h2>
-                <button id="close-modal" class="close-btn">✕</button>
-            </div>
-            
-            <div id="modal-recipe-info" class="modal-info"></div>
-            
-            <div class="nutrition-grid" id="modal-nutrition-grid"></div>
-            
-            <div class="modal-section">
-                <h3>食譜內容：</h3>
-                <div id="modal-recipe-content" class="recipe-content"></div>
-            </div>
-
-            <div id="modal-ingredients-section" class="modal-section hidden">
-                <h3>識別的食材：</h3>
-                <div id="modal-ingredients-list" class="ingredients-list"></div>
-            </div>
+        <!-- 已儲存的食譜列表 -->
+        <div class="card">
+            <h2>📚 我的食譜</h2>
+            <div id="recipeList" class="recipe-list"></div>
         </div>
     </div>
     </section>
