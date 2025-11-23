@@ -908,16 +908,6 @@ window.addEventListener('load', async () => {
 // ==================== 全域變數 ====================
 let currentAnalysisResult = null;
 
-// 從主應用取得 token
-function getToken() {
-  // 如果有主應用的 memory 物件
-  if (typeof memory !== 'undefined' && memory.token) {
-    return memory.token;
-  }
-  // 否則從 localStorage 取得（備用方案，實際應避免）
-  return localStorage.getItem('token');
-}
-
 // ==================== 分析食譜 ====================
 async function analyzeRecipe() {
   const recipeName = document.getElementById('recipeName').value.trim();
@@ -933,7 +923,7 @@ async function analyzeRecipe() {
     return;
   }
 
-  const token = getToken();
+  const token = memory.token;
   if (!token) {
     alert('請先登入');
     return;
@@ -1058,7 +1048,7 @@ function displayResult(result) {
   document.getElementById('resultSection').classList.add('show');
 }
 
-// ==================== 儲存食譜 ====================
+// ==================== 儲存食譜（修正版）====================
 async function saveRecipe() {
   if (!currentAnalysisResult) {
     alert('請先分析食譜');
@@ -1069,11 +1059,18 @@ async function saveRecipe() {
   const recipeContent = document.getElementById('recipeContent').value.trim();
   const servings = parseInt(document.getElementById('servings').value) || 1;
 
-  const token = getToken();
+  const token = memory.token;
   if (!token) {
     alert('請先登入');
     return;
   }
+
+  console.log('💾 準備儲存食譜:', {
+    recipeName,
+    servings,
+    hasNutrition: !!currentAnalysisResult.nutrition,
+    hasIngredients: !!currentAnalysisResult.ingredients
+  });
 
   try {
     const response = await fetch('http://localhost:3000/api/recipes', {
@@ -1110,7 +1107,7 @@ async function saveRecipe() {
 
 // ==================== 載入食譜列表 ====================
 async function loadRecipes() {
-  const token = getToken();
+  const token = memory.token;
   if (!token) {
     document.getElementById('recipeList').innerHTML = '<p style="color: #999;">請先登入以查看食譜</p>';
     return;
@@ -1153,7 +1150,7 @@ async function loadRecipes() {
 
 // ==================== 查看食譜詳情 ====================
 async function viewRecipe(recipeId) {
-  const token = getToken();
+  const token = memory.token;
   if (!token) return;
 
   try {
@@ -1211,5 +1208,8 @@ function analyzeAgain() {
 
 // ==================== 頁面載入時執行 ====================
 window.addEventListener('DOMContentLoaded', () => {
-  loadRecipes();
+  // 如果已登入，載入食譜列表
+  if (memory.token) {
+    loadRecipes();
+  }
 });
