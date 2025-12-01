@@ -1,0 +1,38 @@
+body {
+  font-family: "Microsoft JhengHei", sans-serif;
+  background: #f8f9fa;
+  margin: 0;
+  padding: 20px;
+}
+.container {
+  max-width: 800px;
+  margin: auto;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.recipes label {
+  display: block;
+  margin: 8px 0;
+  cursor: pointer;
+}
+.controls {
+  margin: 20px 0;
+}
+#calc {
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.result {
+  margin-top: 20px;
+  padding: 15px;
+  background: #e9f7ef;
+  border-radius: 8px;
+  border-left: 5px solid #28a745;
+}

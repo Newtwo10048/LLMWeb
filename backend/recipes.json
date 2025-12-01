@@ -1,0 +1,277 @@
+[
+  {
+    "name": "青花菜海鮮濃湯",
+    "calories": 143,
+    "portions": {
+      "水果": 0.3,
+      "蔬菜": 1.5,
+      "豆魚蛋肉": 0.6,
+      "全谷雜糧": 0.5,
+      "奶類": 0,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "南瓜", "amount": 55, "unit": "公克"},
+      {"name": "蝦仁", "amount": 50, "unit": "公克"},
+      {"name": "小卷", "amount": 35, "unit": "公克"},
+      {"name": "蛤蜊", "amount": 6, "unit": "個"},
+      {"name": "洋蔥", "amount": 40, "unit": "公克"},
+      {"name": "青花菜", "amount": 80, "unit": "公克"},
+      {"name": "橄欖油", "amount": 1, "unit": "茶匙"},
+      {"name": "蒜片", "amount": 3, "unit": "片"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "白胡椒粉", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "滷梅花重疊肉",
+    "calories": 248,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1.7,
+      "豆魚蛋肉": 0.5,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "梅花肉片", "amount": 120, "unit": "公克"},
+      {"name": "蔥", "amount": 10, "unit": "公克"},
+      {"name": "薑", "amount": 2, "unit": "片"},
+      {"name": "青江菜", "amount": 100, "unit": "公克"},
+      {"name": "太白粉", "amount": 0, "unit": "少許"},
+      {"name": "醬油", "amount": 2, "unit": "大匙"},
+      {"name": "糖", "amount": 0, "unit": "少許"},
+      {"name": "酒", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "健康蔬菜粥",
+    "calories": 269,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 2,
+      "豆魚蛋肉": 1.3,
+      "全谷雜糧": 0.6,
+      "奶類": 0.5,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "洋蔥", "amount": 40, "unit": "公克"},
+      {"name": "胡蘿蔔", "amount": 20, "unit": "公克"},
+      {"name": "高麗菜", "amount": 60, "unit": "公克"},
+      {"name": "芹菜末", "amount": 0, "unit": "少許"},
+      {"name": "豆皮", "amount": 0.5, "unit": "片"},
+      {"name": "植物油", "amount": 1, "unit": "茶匙"},
+      {"name": "豬絞肉", "amount": 70, "unit": "公克"},
+      {"name": "胚芽米", "amount": 0.5, "unit": "米杯"},
+      {"name": "水", "amount": 3, "unit": "杯"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "醬油", "amount": 0, "unit": "少許"},
+      {"name": "胡椒粉", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "塔塔香肉燥飯",
+    "calories": 315,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 3,
+      "豆魚蛋肉": 1,
+      "全谷雜糧": 0.2,
+      "奶類": 0.5,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "杏鮑菇", "amount": 30, "unit": "公克"},
+      {"name": "蒜頭", "amount": 1, "unit": "顆"},
+      {"name": "九層塔", "amount": 10, "unit": "公克"},
+      {"name": "植物油", "amount": 1, "unit": "茶匙"},
+      {"name": "豬絞肉", "amount": 70, "unit": "公克"},
+      {"name": "胚芽米飯", "amount": 1.5, "unit": "碗"},
+      {"name": "白芝麻", "amount": 0, "unit": "少許"},
+      {"name": "醬油", "amount": 1, "unit": "茶匙"},
+      {"name": "米酒", "amount": 0, "unit": "少許"},
+      {"name": "糖", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "咖哩菇菇歐姆蛋",
+    "calories": 149,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1,
+      "豆魚蛋肉": 0.5,
+      "全谷雜糧": 0,
+      "奶類": 1,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "鮮香菇", "amount": 1, "unit": "朵"},
+      {"name": "金針菇", "amount": 20, "unit": "公克"},
+      {"name": "美白菇", "amount": 20, "unit": "公克"},
+      {"name": "雞蛋", "amount": 2, "unit": "個"},
+      {"name": "蔥花", "amount": 0, "unit": "少許"},
+      {"name": "植物油", "amount": 2, "unit": "茶匙"},
+      {"name": "洋蔥", "amount": 40, "unit": "公克"},
+      {"name": "水", "amount": 200, "unit": "毫升"},
+      {"name": "咖哩粉", "amount": 1, "unit": "茶匙"},
+      {"name": "番茄醬", "amount": 2, "unit": "茶匙"},
+      {"name": "鹽", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "味噌茄子",
+    "calories": 109,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1,
+      "豆魚蛋肉": 0,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 1.5
+    },
+    "ingredients": [
+      {"name": "茄子", "amount": 200, "unit": "公克"},
+      {"name": "橄欖油", "amount": 1, "unit": "茶匙"},
+      {"name": "白芝麻", "amount": 10, "unit": "公克"},
+      {"name": "水", "amount": 0.75, "unit": "杯"},
+      {"name": "味噌", "amount": 1, "unit": "大匙"},
+      {"name": "細砂糖", "amount": 0, "unit": "少許"},
+      {"name": "開水", "amount": 1.5, "unit": "大匙"}
+    ]
+  },
+  {
+    "name": "秋葵豆腐",
+    "calories": 88,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1,
+      "豆魚蛋肉": 0.5,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "豆腐", "amount": 1, "unit": "盒"},
+      {"name": "秋葵", "amount": 100, "unit": "公克"},
+      {"name": "蒜末", "amount": 0, "unit": "少許"},
+      {"name": "紅辣椒末", "amount": 0, "unit": "少許"},
+      {"name": "蔥花", "amount": 0, "unit": "少許"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "醬油", "amount": 0, "unit": "少許"},
+      {"name": "糖", "amount": 0, "unit": "少許"},
+      {"name": "黑醋", "amount": 0, "unit": "少許"},
+      {"name": "香油", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "米苔目湯",
+    "calories": 255,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1.2,
+      "豆魚蛋肉": 0.4,
+      "全谷雜糧": 0.5,
+      "奶類": 0,
+      "堅果油脂": 2
+    },
+    "ingredients": [
+      {"name": "韭菜", "amount": 20, "unit": "公克"},
+      {"name": "蝦米", "amount": 5, "unit": "公克"},
+      {"name": "紅蔥頭", "amount": 0, "unit": "少許"},
+      {"name": "肉絲", "amount": 70, "unit": "公克"},
+      {"name": "米苔目", "amount": 200, "unit": "公克"},
+      {"name": "綠豆芽", "amount": 50, "unit": "公克"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "麻油", "amount": 1, "unit": "茶匙"}
+    ]
+  },
+  {
+    "name": "皇宮菜麻油豬肝",
+    "calories": 175,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1.5,
+      "豆魚蛋肉": 1,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 1.5
+    },
+    "ingredients": [
+      {"name": "皇宮菜", "amount": 200, "unit": "公克"},
+      {"name": "豬肝", "amount": 90, "unit": "公克"},
+      {"name": "麻油", "amount": 1, "unit": "大匙"},
+      {"name": "薑片", "amount": 0, "unit": "少許"},
+      {"name": "米酒", "amount": 0, "unit": "少許"},
+      {"name": "鹽", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "茄汁秋刀魚",
+    "calories": 313,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 2,
+      "豆魚蛋肉": 0.5,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 1
+    },
+    "ingredients": [
+      {"name": "秋刀魚", "amount": 2, "unit": "尾"},
+      {"name": "番茄", "amount": 1, "unit": "碗"},
+      {"name": "洋蔥", "amount": 40, "unit": "公克"},
+      {"name": "植物油", "amount": 2, "unit": "茶匙"},
+      {"name": "米酒", "amount": 0, "unit": "少許"},
+      {"name": "糖", "amount": 0, "unit": "少許"},
+      {"name": "番茄醬", "amount": 2, "unit": "大匙"}
+    ]
+  },
+  {
+    "name": "菠菜起司烘蛋",
+    "calories": 210,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 1,
+      "豆魚蛋肉": 1.1,
+      "全谷雜糧": 0,
+      "奶類": 0.8,
+      "堅果油脂": 0.5
+    },
+    "ingredients": [
+      {"name": "菠菜", "amount": 200, "unit": "公克"},
+      {"name": "雞蛋", "amount": 2, "unit": "個"},
+      {"name": "奶油", "amount": 1, "unit": "茶匙"},
+      {"name": "大蒜片", "amount": 2, "unit": "瓣"},
+      {"name": "番茄", "amount": 0, "unit": "少許"},
+      {"name": "橄欖油", "amount": 1, "unit": "茶匙"},
+      {"name": "起司絲", "amount": 35, "unit": "克"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "胡椒粉", "amount": 0, "unit": "少許"}
+    ]
+  },
+  {
+    "name": "白菜燉雞湯",
+    "calories": 200,
+    "portions": {
+      "水果": 0,
+      "蔬菜": 2.5,
+      "豆魚蛋肉": 2.5,
+      "全谷雜糧": 0,
+      "奶類": 0,
+      "堅果油脂": 0
+    },
+    "ingredients": [
+      {"name": "大白菜", "amount": 250, "unit": "公克"},
+      {"name": "白蘿蔔", "amount": 150, "unit": "公克"},
+      {"name": "香菇", "amount": 4, "unit": "朵"},
+      {"name": "去骨雞腿", "amount": 200, "unit": "公克"},
+      {"name": "薑片", "amount": 4, "unit": "片"},
+      {"name": "枸杞", "amount": 0, "unit": "少許"},
+      {"name": "水", "amount": 1, "unit": "公升"},
+      {"name": "鹽", "amount": 0, "unit": "少許"},
+      {"name": "酒", "amount": 0, "unit": "少許"}
+    ]
+  }
+]

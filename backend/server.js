@@ -11,6 +11,7 @@ import path from "path";
 import { spawn } from "child_process";  // 執行 Ollama AI
 import { fileURLToPath } from "url";
 import { OAuth2Client } from "google-auth-library"; // Google 登入驗證
+import axios from "axios";
 
 // ==================== 環境變數與常數 ====================
 const PORT = 3000;
@@ -20,16 +21,18 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "1012981023049-ei8qt2b4
 const app = express();
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+
 // ==================== Middleware 設定 ====================
 app.use(bodyParser.json());  // 解析 JSON 請求
 app.use(cors());             // 允許跨域請求
 app.use(express.static('public')); // 提供靜態檔案
+app.use(express.json());
+
 
 // 設定靜態檔案路徑
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(express.static(path.join(__dirname, "public")));
-
+app.use(express.static(path.join(__dirname, "frontend")));
 // ==================== MySQL 連線池 ====================
 const db = mysql.createPool({
   host: 'localhost',
@@ -1107,23 +1110,255 @@ function extractNutritionFromText(text) {
   };
 }
 
-// ==================== 靜態檔案服務 ====================
-// 提供前端 HTML/CSS/JS 檔案
-app.use('/', express.static(path.join(__dirname, '..', 'frontend')));
-
-// ==================== 404 處理 ====================
-app.use((req, res) => {
-  res.status(404).json({ error: '找不到此 API 路徑' });
+// ==================== 食譜MVP ====================
+// 代理：取得食譜列表
+app.get('/api/recipesMVP', async (req, res) => {
+  try {
+    console.log('收到請求: GET /api/recipesMVP');
+    const response = await axios.get('http://localhost:5000/api/recipesMVP');
+    console.log('Flask 返回成功');
+    res.json(response.data);
+  } catch (error) {
+    console.error('Flask 連線失敗:', error.message);
+    res.status(500).json({ error: '無法載入食譜，請確認 Flask 是否啟動' });
+  }
 });
 
-// ==================== 錯誤處理中介層 ====================
-app.use((err, req, res, next) => {
-  console.error('❌ 伺服器錯誤:', err);
-  res.status(500).json({ 
-    error: '伺服器內部錯誤', 
-    message: err.message 
-  });
+// 代理：計算營養
+app.post('/api/calculate', async (req, res) => {
+  try {
+    console.log('收到請求: POST /api/calculate');
+    const response = await axios.post('http://localhost:5000/api/calculate', req.body);
+    console.log('Flask 計算成功');
+    res.json(response.data);
+  } catch (error) {
+    console.error('Flask 計算失敗:', error.message);
+    res.status(500).json({ error: '計算失敗，請確認 Flask 是否啟動' });
+  }
 });
+
+// ==================== FooDB API (食物資料庫查詢) ====================
+// 將以下代碼加入到你的 server.js 檔案中
+
+// 取得所有食物 (帶分頁和搜尋)
+app.get('/api/foodb/foods', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 24, 
+      search = '', 
+      group = '',
+      subgroup = ''
+    } = req.query;
+    
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    let params = [];
+    
+    // 搜尋條件
+    if (search) {
+      whereConditions.push('(name LIKE ? OR name_scientific LIKE ? OR description LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    
+    if (group && group !== 'all') {
+      whereConditions.push('food_group = ?');
+      params.push(group);
+    }
+    
+    if (subgroup && subgroup !== 'all') {
+      whereConditions.push('food_subgroup = ?');
+      params.push(subgroup);
+    }
+    
+    const whereClause = whereConditions.length > 0 
+      ? 'WHERE ' + whereConditions.join(' AND ')
+      : '';
+    
+    // 查詢資料
+    const query = `
+      SELECT 
+        id, name, name_scientific, description, 
+        food_group, food_subgroup, food_type,
+        picture_file_name, public_id
+      FROM foods 
+      ${whereClause}
+      ORDER BY name
+      LIMIT ? OFFSET ?
+    `;
+    
+    const [foods] = await db.query(query, [...params, parseInt(limit), offset]);
+    
+    // 查詢總數
+    const countQuery = `SELECT COUNT(*) as total FROM foods ${whereClause}`;
+    const [countResult] = await db.query(countQuery, params);
+    const total = countResult[0].total;
+    
+    res.json({
+      foods,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('FooDB 查詢錯誤:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得單一食物詳情
+app.get('/api/foodb/foods/:id', async (req, res) => {
+  try {
+    const [foods] = await db.query(
+      'SELECT * FROM foods WHERE id = ? OR public_id = ?',
+      [req.params.id, req.params.id]
+    );
+    
+    if (foods.length === 0) {
+      return res.status(404).json({ error: '找不到該食物' });
+    }
+    
+    res.json(foods[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得食物的營養成分
+app.get('/api/foodb/foods/:id/nutrients', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        n.id, n.name, n.description,
+        c.orig_content as content,
+        c.orig_unit as unit,
+        c.orig_min as min_content,
+        c.orig_max as max_content
+      FROM contents c
+      JOIN nutrients n ON c.source_id = n.id
+      WHERE c.food_id = ? 
+        AND c.source_type = 'Nutrient'
+      ORDER BY n.name
+      LIMIT 50
+    `;
+    
+    const [nutrients] = await db.query(query, [req.params.id]);
+    res.json({ nutrients });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得食物的化合物
+app.get('/api/foodb/foods/:id/compounds', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        co.id, co.name, co.description,
+        c.orig_content as content,
+        c.orig_unit as unit
+      FROM contents c
+      JOIN compounds co ON c.source_id = co.id
+      WHERE c.food_id = ? 
+        AND c.source_type = 'Compound'
+      ORDER BY co.name
+      LIMIT 100
+    `;
+    
+    const [compounds] = await db.query(query, [req.params.id]);
+    res.json({ compounds });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得所有食物分類
+app.get('/api/foodb/food-groups', async (req, res) => {
+  try {
+    const [groups] = await db.query(`
+      SELECT DISTINCT food_group, COUNT(*) as count
+      FROM foods 
+      WHERE food_group IS NOT NULL
+      GROUP BY food_group
+      ORDER BY food_group
+    `);
+    res.json({ groups });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得食物子分類
+app.get('/api/foodb/food-subgroups', async (req, res) => {
+  try {
+    const { group } = req.query;
+    const whereClause = group ? 'WHERE food_group = ?' : '';
+    const params = group ? [group] : [];
+    
+    const [subgroups] = await db.query(`
+      SELECT DISTINCT food_subgroup, COUNT(*) as count
+      FROM foods 
+      ${whereClause}
+      GROUP BY food_subgroup
+      ORDER BY food_subgroup
+    `, params);
+    
+    res.json({ subgroups });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 取得資料庫統計資訊
+app.get('/api/foodb/statistics', async (req, res) => {
+  try {
+    const [foodCount] = await db.query('SELECT COUNT(*) as count FROM foods');
+    const [compoundCount] = await db.query('SELECT COUNT(*) as count FROM compounds');
+    const [nutrientCount] = await db.query('SELECT COUNT(*) as count FROM nutrients');
+    const [groups] = await db.query('SELECT COUNT(DISTINCT food_group) as count FROM foods');
+    
+    res.json({
+      total_foods: foodCount[0].count,
+      total_compounds: compoundCount[0].count,
+      total_nutrients: nutrientCount[0].count,
+      total_food_groups: groups[0].count
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 搜尋建議 (自動完成)
+app.get('/api/foodb/search/suggestions', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.length < 2) {
+      return res.json({ suggestions: [] });
+    }
+    
+    const [suggestions] = await db.query(`
+      SELECT id, name, food_group, public_id
+      FROM foods
+      WHERE name LIKE ?
+      ORDER BY name
+      LIMIT 10
+    `, [`${q}%`]);
+    
+    res.json({ suggestions });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+console.log('📊 FooDB API 已載入');
+console.log('   GET  /api/foodb/foods              - 取得食物列表');
+console.log('   GET  /api/foodb/foods/:id          - 取得食物詳情');
+console.log('   GET  /api/foodb/foods/:id/nutrients - 取得營養成分');
+console.log('   GET  /api/foodb/food-groups        - 取得分類');
+console.log('   GET  /api/foodb/statistics         - 取得統計資訊');
 
 // ==================== 啟動伺服器 ====================
 app.listen(PORT, () => {
@@ -1152,4 +1387,22 @@ app.listen(PORT, () => {
   console.log(`   POST /api/recipes          - 儲存食譜`);
   console.log(`   GET  /api/recipes/:id      - 取得食譜詳情`);
   console.log(`   DELETE /api/recipes/:id    - 刪除食譜`);
+});
+
+// ==================== 靜態檔案服務 ====================要在app後面
+// 提供前端 HTML/CSS/JS 檔案
+app.use('/', express.static(path.join(__dirname, '..', 'frontend')));
+
+// ==================== 404 處理 ====================
+app.use((req, res) => {
+  res.status(404).json({ error: '找不到此 API 路徑' });
+});
+
+// ==================== 錯誤處理中介層 ====================
+app.use((err, req, res, next) => {
+  console.error('❌ 伺服器錯誤:', err);
+  res.status(500).json({ 
+    error: '伺服器內部錯誤', 
+    message: err.message 
+  });
 });

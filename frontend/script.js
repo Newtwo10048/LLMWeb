@@ -1213,3 +1213,426 @@ window.addEventListener('DOMContentLoaded', () => {
     loadRecipes();
   }
 });
+
+//==================== 食譜MVP ====================
+// 載入食譜列表
+fetch('/api/recipesMVP')
+  .then(r => r.json())
+  .then(recipes => {
+    console.log('收到的數據:', recipes);  // 添加這行！
+    console.log('數據類型:', typeof recipes);  // 添加這行！
+    console.log('是否為陣列:', Array.isArray(recipes));  // 添加這行！
+    
+    // 檢查數據格式
+    if (!Array.isArray(recipes)) {
+      console.error('返回的不是陣列！實際數據:', recipes);
+      document.getElementById('recipe-list').innerHTML = 
+        '<p style="color: red;">數據格式錯誤，請檢查後端返回格式</p>';
+      return;
+    }
+    
+    const container = document.getElementById('recipe-list');
+    recipes.forEach((r, idx) => {
+      const label = document.createElement('label');
+      label.className = 'recipe-item';
+      label.innerHTML = `
+        <input type="checkbox" class="recipe-cb" data-idx="${idx}" />
+        ${r.name} (${r.calories} kcal)
+      `;
+      container.appendChild(label);
+      container.appendChild(document.createElement('br'));
+    });
+  })
+  .catch(error => {
+    console.error('載入食譜失敗:', error);
+    document.getElementById('recipe-list').innerHTML = 
+      '<p style="color: red;">無法載入食譜，請確認後端服務是否啟動</p>';
+  });
+
+// 計算營養
+const calcBtn = document.getElementById('mvp-calc');
+const resultDiv = document.getElementById('mvp-result');
+const servingsInput = document.getElementById('mvp-servings');
+
+if (calcBtn) {
+  calcBtn.onclick = () => {
+    const selected = Array.from(document.querySelectorAll('.recipe-cb'))
+      .filter(cb => cb.checked)
+      .map(cb => parseInt(cb.dataset.idx));
+    
+    if (selected.length === 0) {
+      alert('請至少選擇一個食譜！');
+      return;
+    }
+    
+    const servings = parseFloat(servingsInput.value) || 1;
+
+    fetch('/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selected, servings })
+    })
+    .then(r => r.json())
+    .then(data => {
+      let html = `<h2>總計（${data.servings} 人份食材）</h2>`;
+      html += `<p><strong>熱量(一人份)：</strong> ${data.calories_per_person} kcal</p>`;
+      
+      html += `<p><strong>營養份數（一人份）：</strong></p><ul>`;
+      for (const [label, value] of Object.entries(data.portions)) {
+        html += `<li>${label}：${value}</li>`;
+      }
+      html += `</ul>`;
+
+      html += `<p><strong>選中食譜與食材（${data.servings} 人份）：</strong></p>`;
+      data.recipes.forEach(recipe => {
+        html += `<h4>${recipe.name}（一人份 ${recipe.calories_one} kcal）</h4><ul>`;
+        recipe.ingredients.forEach(ing => html += `<li>${ing}</li>`);
+        html += `</ul>`;
+      });
+
+      if (data.advice.length > 0) {
+        html += `<p><strong>建議：</strong></p><ul>`;
+        data.advice.forEach(a => html += `<li>${a}</li>`);
+        html += `</ul>`;
+      }
+
+      resultDiv.innerHTML = html;
+    })
+    .catch(error => {
+      resultDiv.innerHTML = '<p style="color: red;">計算失敗，請檢查後端服務</p>';
+      console.error('Error:', error);
+    });
+  };
+}
+// ==================== 全域變數 ====================
+const API_URL = 'http://localhost:3000/api/foodb';
+let currentPage = 1;
+const limit = 24;
+
+// ==================== 初始化 ====================
+document.addEventListener('DOMContentLoaded', () => {
+  loadStatistics();
+  loadFoodGroups();
+  loadFoods();
+  
+  // 搜尋事件 (防抖動)
+  let searchTimeout;
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentPage = 1;
+      loadFoods();
+    }, 500);
+  });
+  
+  // 分類篩選事件
+  document.getElementById('groupFilter').addEventListener('change', () => {
+    currentPage = 1;
+    loadFoods();
+  });
+  
+  // 點擊彈窗外部關閉
+  document.getElementById('modal').addEventListener('click', (e) => {
+    if (e.target.id === 'modal') {
+      closeModal();
+    }
+  });
+});
+
+// ==================== 載入統計資訊 ====================
+async function loadStatistics() {
+  try {
+    const response = await fetch(`${API_URL}/statistics`);
+    const data = await response.json();
+    
+    document.getElementById('statFoods').textContent = data.total_foods.toLocaleString();
+    document.getElementById('statCompounds').textContent = data.total_compounds.toLocaleString();
+    document.getElementById('statNutrients').textContent = data.total_nutrients.toLocaleString();
+    document.getElementById('statGroups').textContent = data.total_food_groups;
+  } catch (error) {
+    console.error('載入統計失敗:', error);
+  }
+}
+
+// ==================== 載入食物分類 ====================
+async function loadFoodGroups() {
+  try {
+    const response = await fetch(`${API_URL}/food-groups`);
+    const data = await response.json();
+    
+    const select = document.getElementById('groupFilter');
+    select.innerHTML = '<option value="all">所有分類</option>';
+    
+    data.groups.forEach(group => {
+      const option = document.createElement('option');
+      option.value = group.food_group;
+      option.textContent = `${group.food_group} (${group.count})`;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('載入分類失敗:', error);
+  }
+}
+
+// ==================== 載入食物列表 ====================
+async function loadFoods() {
+  const searchTerm = document.getElementById('searchInput').value;
+  const group = document.getElementById('groupFilter').value;
+  
+  const loadingState = document.getElementById('loadingState');
+  const foodsGrid = document.getElementById('foodsGrid');
+  const pagination = document.getElementById('pagination');
+  
+  // 顯示載入狀態
+  loadingState.classList.add('active');
+  foodsGrid.innerHTML = '';
+  pagination.innerHTML = '';
+  
+  try {
+    const params = new URLSearchParams({
+      page: currentPage,
+      limit: limit,
+      search: searchTerm,
+      group: group
+    });
+    
+    const response = await fetch(`${API_URL}/foods?${params}`);
+    
+    if (!response.ok) {
+      throw new Error('載入失敗');
+    }
+    
+    const data = await response.json();
+    
+    // 隱藏載入狀態
+    loadingState.classList.remove('active');
+    
+    // 更新結果計數
+    document.getElementById('resultCount').textContent = 
+      `顯示 ${data.foods.length} / ${data.pagination.total.toLocaleString()} 筆資料`;
+    
+    // 渲染食物卡片
+    if (data.foods.length === 0) {
+      foodsGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 64px 20px; color: #999;">
+          <svg style="width: 64px; height: 64px; margin-bottom: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <h3 style="font-size: 20px; margin-bottom: 8px;">找不到相關食物</h3>
+          <p>請嘗試其他搜尋關鍵字或篩選條件</p>
+        </div>
+      `;
+    } else {
+      data.foods.forEach(food => {
+        foodsGrid.appendChild(createFoodCard(food));
+      });
+    }
+    
+    // 渲染分頁
+    if (data.pagination.totalPages > 1) {
+      renderPagination(data.pagination);
+    }
+    
+  } catch (error) {
+    console.error('載入食物失敗:', error);
+    loadingState.classList.remove('active');
+    foodsGrid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 64px 20px; color: #f44336;">
+        <h3 style="font-size: 20px; margin-bottom: 8px;">⚠️ 載入失敗</h3>
+        <p>請確認後端伺服器已啟動</p>
+        <button onclick="loadFoods()" style="margin-top: 16px; padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 8px; cursor: pointer;">
+          重試
+        </button>
+      </div>
+    `;
+  }
+}
+
+// ==================== 建立食物卡片 ====================
+function createFoodCard(food) {
+  const card = document.createElement('div');
+  card.className = 'food-card';
+  card.onclick = () => openModal(food.id);
+  
+  card.innerHTML = `
+    <div class="food-card-header">
+      <div class="food-card-title">${escapeHtml(food.name)}</div>
+      ${food.name_scientific ? `<div class="food-card-scientific">${escapeHtml(food.name_scientific)}</div>` : ''}
+    </div>
+    <div class="food-card-body">
+      <div class="food-card-tags">
+        ${food.food_group ? `<span class="tag tag-group">${escapeHtml(food.food_group)}</span>` : ''}
+        ${food.food_subgroup ? `<span class="tag tag-subgroup">${escapeHtml(food.food_subgroup)}</span>` : ''}
+      </div>
+      ${food.description ? `<div class="food-card-description">${escapeHtml(food.description)}</div>` : ''}
+      <div class="food-card-footer">
+        <span class="food-card-id">${food.public_id || `ID: ${food.id}`}</span>
+        <span class="food-card-link">查看詳情 →</span>
+      </div>
+    </div>
+  `;
+  
+  return card;
+}
+
+// ==================== 渲染分頁 ====================
+function renderPagination(pagination) {
+  const paginationDiv = document.getElementById('pagination');
+  
+  paginationDiv.innerHTML = `
+    <button onclick="changePage(${pagination.page - 1})" ${pagination.page === 1 ? 'disabled' : ''}>
+      ← 上一頁
+    </button>
+    <div class="pagination-info">
+      第 <span>${pagination.page}</span> / ${pagination.totalPages} 頁
+      (共 ${pagination.total.toLocaleString()} 筆)
+    </div>
+    <button onclick="changePage(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>
+      下一頁 →
+    </button>
+  `;
+}
+
+// ==================== 換頁 ====================
+function changePage(page) {
+  currentPage = page;
+  loadFoods();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ==================== 開啟彈窗 ====================
+async function openModal(foodId) {
+  const modal = document.getElementById('modal');
+  modal.classList.add('active');
+  
+  // 載入食物詳情
+  try {
+    const response = await fetch(`${API_URL}/foods/${foodId}`);
+    const food = await response.json();
+    
+    document.getElementById('modalTitle').textContent = food.name;
+    document.getElementById('modalScientific').textContent = food.name_scientific || '';
+    document.getElementById('modalGroup').textContent = food.food_group || '未分類';
+    document.getElementById('modalSubgroup').textContent = food.food_subgroup || '未分類';
+    document.getElementById('modalId').textContent = food.public_id || `ID: ${food.id}`;
+    document.getElementById('modalDescription').textContent = food.description || '暫無描述';
+    
+    // 載入營養成分
+    loadNutrients(foodId);
+    
+  } catch (error) {
+    console.error('載入食物詳情失敗:', error);
+    closeModal();
+    alert('載入失敗,請稍後再試');
+  }
+}
+
+// ==================== 載入營養成分 ====================
+async function loadNutrients(foodId) {
+  const nutrientsList = document.getElementById('nutrientsList');
+  nutrientsList.innerHTML = '<div class="nutrients-loading">載入營養資訊中...</div>';
+  
+  try {
+    const response = await fetch(`${API_URL}/foods/${foodId}/nutrients`);
+    const data = await response.json();
+    
+    document.getElementById('nutrientCount').textContent = `(${data.nutrients.length})`;
+    
+    if (data.nutrients.length === 0) {
+      nutrientsList.innerHTML = '<div class="nutrients-loading">暫無營養資訊</div>';
+      return;
+    }
+    
+    nutrientsList.innerHTML = '';
+    data.nutrients.forEach(nutrient => {
+      const item = document.createElement('div');
+      item.className = 'nutrient-item';
+      
+      // 解析營養素名稱並增加說明
+      const nutrientInfo = parseNutrientName(nutrient.name);
+      
+      item.innerHTML = `
+        <div class="nutrient-name">
+          ${escapeHtml(nutrientInfo.displayName)}
+          ${nutrientInfo.description ? `<span class="nutrient-description">${nutrientInfo.description}</span>` : ''}
+        </div>
+        <div class="nutrient-value">${nutrient.content} ${nutrient.unit || ''}</div>
+      `;
+      nutrientsList.appendChild(item);
+    });
+    
+  } catch (error) {
+    console.error('載入營養成分失敗:', error);
+    nutrientsList.innerHTML = '<div class="nutrients-loading">載入失敗</div>';
+  }
+}
+
+// ==================== 解析營養素名稱 ====================
+function parseNutrientName(name) {
+  // 脂肪酸格式: 數字:數字 [後綴]
+  const fattyAcidPattern = /^(\d+):(\d+)\s*(.*)$/;
+  const match = name.match(fattyAcidPattern);
+  
+  if (match) {
+    const carbonNum = match[1];  // 碳數
+    const doubleNum = match[2];  // 雙鍵數
+    const suffix = match[3].trim(); // 後綴
+    
+    // 構建顯示名稱
+    let displayName = `C${carbonNum}:${doubleNum}`;
+    let description = `${carbonNum}碳-${doubleNum}雙鍵`;
+    
+    // 解析後綴
+    if (suffix) {
+      if (suffix === 'c') {
+        displayName += ' (順式)';
+        description += ' 順式結構';
+      } else if (suffix === 't') {
+        displayName += ' (反式)';
+        description += ' 反式結構 ⚠️';
+      } else if (suffix.includes('undifferentiated')) {
+        displayName += ' (總量)';
+        description += ' 未區分順反式';
+      } else {
+        displayName += ` ${suffix}`;
+      }
+    }
+    
+    // 添加常見脂肪酸的中文名稱
+    const commonNames = {
+      '14:0': '肉豆蔻酸',
+      '16:0': '棕櫚酸',
+      '18:0': '硬脂酸',
+      '18:1': '油酸',
+      '18:2': '亞麻油酸',
+      '18:3': 'α-亞麻酸',
+      '20:4': '花生四烯酸',
+      '20:5': 'EPA',
+      '22:6': 'DHA'
+    };
+    
+    const key = `${carbonNum}:${doubleNum}`;
+    if (commonNames[key]) {
+      displayName = `${displayName} - ${commonNames[key]}`;
+    }
+    
+    return { displayName, description };
+  }
+  
+  // 如果不是脂肪酸格式,直接返回原名稱
+  return { displayName: name, description: null };
+}
+
+// ==================== 關閉彈窗 ====================
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+// ==================== 工具函數:HTML 轉義 ====================
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
