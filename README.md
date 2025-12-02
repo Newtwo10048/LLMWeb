@@ -402,6 +402,14 @@ node server.js
 http://localhost:3000
 ```
 
+### 9. MYSQL
+```
+# 在 MySQL 中匯入你的 foodball 資料
+mysql -u root -p
+CREATE DATABASE foodball;
+USE foodball;
+SOURCE /path/to/your/foodball.sql;
+```
 ## 📁 專案結構
 
 ```
