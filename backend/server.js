@@ -1227,50 +1227,66 @@ app.get('/api/foodb/foods/:id', async (req, res) => {
   }
 });
 
-// 取得食物的營養成分
+// 取得食物的營養成分 (包含資料來源)
 app.get('/api/foodb/foods/:id/nutrients', async (req, res) => {
   try {
     const query = `
       SELECT 
-        n.id, n.name, n.description,
+        n.id, 
+        n.name, 
+        n.description,
         c.orig_content as content,
         c.orig_unit as unit,
         c.orig_min as min_content,
-        c.orig_max as max_content
+        c.orig_max as max_content,
+        c.source_type,
+        c.orig_citation as reference,
+        c.citation as formatted_reference,
+        c.citation_type,
+        c.orig_source_name as source_name
       FROM contents c
       JOIN nutrients n ON c.source_id = n.id
       WHERE c.food_id = ? 
         AND c.source_type = 'Nutrient'
       ORDER BY n.name
-      LIMIT 50
     `;
     
     const [nutrients] = await db.query(query, [req.params.id]);
     res.json({ nutrients });
   } catch (error) {
+    console.error('Nutrients API 錯誤:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 取得食物的化合物
+// 取得食物的化合物 (包含資料來源)
 app.get('/api/foodb/foods/:id/compounds', async (req, res) => {
   try {
     const query = `
       SELECT 
-        co.id, co.name, co.description,
+        co.id, 
+        co.name, 
+        co.description,
         c.orig_content as content,
-        c.orig_unit as unit
+        c.orig_unit as unit,
+        c.orig_min as min_content,
+        c.orig_max as max_content,
+        c.source_type,
+        c.orig_citation as reference,
+        c.citation as formatted_reference,
+        c.citation_type,
+        c.orig_source_name as source_name
       FROM contents c
       JOIN compounds co ON c.source_id = co.id
       WHERE c.food_id = ? 
         AND c.source_type = 'Compound'
       ORDER BY co.name
-      LIMIT 100
     `;
     
     const [compounds] = await db.query(query, [req.params.id]);
     res.json({ compounds });
   } catch (error) {
+    console.error('Compounds API 錯誤:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1327,6 +1343,158 @@ app.get('/api/foodb/statistics', async (req, res) => {
       total_food_groups: groups[0].count
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 反向搜尋：根據營養素含量搜尋食物
+app.get('/api/foodb/search-by-nutrient', async (req, res) => {
+  try {
+    const { 
+      nutrient_name = '', 
+      page = 1, 
+      limit = 24,
+      min_content = 0 
+    } = req.query;
+    
+    if (!nutrient_name) {
+      return res.status(400).json({ error: '請提供營養素名稱' });
+    }
+    
+    const offset = (page - 1) * limit;
+    
+    const query = `
+      SELECT 
+        f.id,
+        f.name,
+        f.name_scientific,
+        f.food_group,
+        f.food_subgroup,
+        f.public_id,
+        f.picture_file_name,
+        n.name as nutrient_name,
+        c.orig_content as content,
+        c.orig_unit as unit
+      FROM contents c
+      JOIN nutrients n ON c.source_id = n.id AND c.source_type = 'Nutrient'
+      JOIN foods f ON c.food_id = f.id
+      WHERE n.name LIKE ?
+        AND c.orig_content >= ?
+        AND c.orig_content IS NOT NULL
+      ORDER BY c.orig_content DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const [foods] = await db.query(query, [
+      `%${nutrient_name}%`,
+      parseFloat(min_content),
+      parseInt(limit),
+      offset
+    ]);
+    
+    // 計算總數
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM contents c
+      JOIN nutrients n ON c.source_id = n.id AND c.source_type = 'Nutrient'
+      WHERE n.name LIKE ?
+        AND c.orig_content >= ?
+        AND c.orig_content IS NOT NULL
+    `;
+    
+    const [countResult] = await db.query(countQuery, [
+      `%${nutrient_name}%`,
+      parseFloat(min_content)
+    ]);
+    
+    res.json({
+      foods,
+      nutrient_name,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: countResult[0].total,
+        totalPages: Math.ceil(countResult[0].total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('反向搜尋錯誤:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 反向搜尋：根據化合物含量搜尋食物
+app.get('/api/foodb/search-by-compound', async (req, res) => {
+  try {
+    const { 
+      compound_name = '', 
+      page = 1, 
+      limit = 24,
+      min_content = 0 
+    } = req.query;
+    
+    if (!compound_name) {
+      return res.status(400).json({ error: '請提供化合物名稱' });
+    }
+    
+    const offset = (page - 1) * limit;
+    
+    const query = `
+      SELECT 
+        f.id,
+        f.name,
+        f.name_scientific,
+        f.food_group,
+        f.food_subgroup,
+        f.public_id,
+        f.picture_file_name,
+        co.name as compound_name,
+        c.orig_content as content,
+        c.orig_unit as unit
+      FROM contents c
+      JOIN compounds co ON c.source_id = co.id AND c.source_type = 'Compound'
+      JOIN foods f ON c.food_id = f.id
+      WHERE co.name LIKE ?
+        AND c.orig_content >= ?
+        AND c.orig_content IS NOT NULL
+      ORDER BY c.orig_content DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const [foods] = await db.query(query, [
+      `%${compound_name}%`,
+      parseFloat(min_content),
+      parseInt(limit),
+      offset
+    ]);
+    
+    // 計算總數
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM contents c
+      JOIN compounds co ON c.source_id = co.id AND c.source_type = 'Compound'
+      WHERE co.name LIKE ?
+        AND c.orig_content >= ?
+        AND c.orig_content IS NOT NULL
+    `;
+    
+    const [countResult] = await db.query(countQuery, [
+      `%${compound_name}%`,
+      parseFloat(min_content)
+    ]);
+    
+    res.json({
+      foods,
+      compound_name,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: countResult[0].total,
+        totalPages: Math.ceil(countResult[0].total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('反向搜尋錯誤:', error);
     res.status(500).json({ error: error.message });
   }
 });

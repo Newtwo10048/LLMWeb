@@ -1455,7 +1455,15 @@ function createFoodCard(food) {
   card.className = 'food-card';
   card.onclick = () => openModal(food.id);
   
+  // 構建圖片 URL
+  const imageUrl = getFoodImageUrl(food);
+  
   card.innerHTML = `
+    ${imageUrl ? `
+      <div class="food-card-image">
+        <img src="${imageUrl}" alt="${escapeHtml(food.name)}" onerror="this.parentElement.remove()">
+      </div>
+    ` : ''}
     <div class="food-card-header">
       <div class="food-card-title">${escapeHtml(food.name)}</div>
       ${food.name_scientific ? `<div class="food-card-scientific">${escapeHtml(food.name_scientific)}</div>` : ''}
@@ -1474,6 +1482,20 @@ function createFoodCard(food) {
   `;
   
   return card;
+}
+
+// ==================== 取得食物圖片 URL ====================
+function getFoodImageUrl(food) {
+  if (!food.picture_file_name) return null;
+  
+  // 方法 1: 嘗試使用 FooDB 官方 CDN
+  // return `https://foodb.ca/system/foods/pictures/000/000/${String(food.id).padStart(3, '0')}/original/${food.picture_file_name}`;
+  
+  // 方法 2: 使用本地圖片 (如果你有下載圖片資料夾)
+  return `/images/foods/${food.picture_file_name}`;
+  
+  // 方法 3: 使用佔位圖
+  // return `https://via.placeholder.com/300x200?text=${encodeURIComponent(food.name)}`;
 }
 
 // ==================== 渲染分頁 ====================
@@ -1518,8 +1540,29 @@ async function openModal(foodId) {
     document.getElementById('modalId').textContent = food.public_id || `ID: ${food.id}`;
     document.getElementById('modalDescription').textContent = food.description || '暫無描述';
     
+    // 顯示圖片
+    const imageUrl = getFoodImageUrl(food);
+    const modalHeader = document.getElementById('modalHeader');
+    
+    // 移除舊的圖片
+    const existingImage = modalHeader.querySelector('.modal-header-image');
+    if (existingImage) existingImage.remove();
+    
+    // 添加新圖片
+    if (imageUrl) {
+      const imageDiv = document.createElement('div');
+      imageDiv.className = 'modal-header-image';
+      imageDiv.innerHTML = `<img src="${imageUrl}" alt="${food.name}" onerror="this.parentElement.remove()">`;
+      modalHeader.style.flexDirection = 'column';
+      modalHeader.style.alignItems = 'flex-start';
+      modalHeader.insertBefore(imageDiv, modalHeader.firstChild);
+    }
+    
     // 載入營養成分
     loadNutrients(foodId);
+    
+    // 載入化合物
+    loadCompounds(foodId);
     
   } catch (error) {
     console.error('載入食物詳情失敗:', error);
@@ -1546,26 +1589,77 @@ async function loadNutrients(foodId) {
     
     nutrientsList.innerHTML = '';
     data.nutrients.forEach(nutrient => {
-      const item = document.createElement('div');
-      item.className = 'nutrient-item';
-      
-      // 解析營養素名稱並增加說明
-      const nutrientInfo = parseNutrientName(nutrient.name);
-      
-      item.innerHTML = `
-        <div class="nutrient-name">
-          ${escapeHtml(nutrientInfo.displayName)}
-          ${nutrientInfo.description ? `<span class="nutrient-description">${nutrientInfo.description}</span>` : ''}
-        </div>
-        <div class="nutrient-value">${nutrient.content} ${nutrient.unit || ''}</div>
-      `;
-      nutrientsList.appendChild(item);
+      nutrientsList.appendChild(createNutrientItem(nutrient));
     });
     
   } catch (error) {
     console.error('載入營養成分失敗:', error);
     nutrientsList.innerHTML = '<div class="nutrients-loading">載入失敗</div>';
   }
+}
+
+// ==================== 載入化合物 ====================
+async function loadCompounds(foodId) {
+  const compoundsList = document.getElementById('compoundsList');
+  compoundsList.innerHTML = '<div class="nutrients-loading">載入化合物資訊中...</div>';
+  
+  try {
+    const response = await fetch(`${API_URL}/foods/${foodId}/compounds`);
+    const data = await response.json();
+    
+    document.getElementById('compoundCount').textContent = `(${data.compounds.length})`;
+    
+    if (data.compounds.length === 0) {
+      compoundsList.innerHTML = '<div class="nutrients-loading">暫無化合物資訊</div>';
+      return;
+    }
+    
+    compoundsList.innerHTML = '';
+    data.compounds.forEach(compound => {
+      compoundsList.appendChild(createNutrientItem(compound));
+    });
+    
+  } catch (error) {
+    console.error('載入化合物失敗:', error);
+    compoundsList.innerHTML = '<div class="nutrients-loading">載入失敗</div>';
+  }
+}
+
+// ==================== 建立營養/化合物項目 ====================
+function createNutrientItem(item) {
+  const element = document.createElement('div');
+  element.className = 'nutrient-item';
+  
+  // 解析營養素名稱
+  const itemInfo = parseNutrientName(item.name);
+  
+  // 顯示 Reference (使用 citation 或 orig_citation)
+  let referenceHtml = '';
+  const citation = item.formatted_reference || item.reference;
+  
+  if (citation && citation.trim() !== '') {
+    // 嘗試從 citation 中提取 PMID
+    const pmidMatch = citation.match(/PMID[:\s]*(\d+)/i);
+    const pmid = pmidMatch ? pmidMatch[1] : null;
+    
+    referenceHtml = `<div class="nutrient-source">
+      📚 ${escapeHtml(citation)}
+      ${pmid ? ` <a href="https://pubmed.ncbi.nlm.nih.gov/${pmid}" target="_blank" class="source-link">[PMID: ${pmid}]</a>` : ''}
+    </div>`;
+  } else if (item.source_name) {
+    referenceHtml = `<div class="nutrient-source">📊 來源: ${escapeHtml(item.source_name)}</div>`;
+  }
+  
+  element.innerHTML = `
+    <div class="nutrient-name">
+      ${escapeHtml(itemInfo.displayName)}
+      ${itemInfo.description ? `<span class="nutrient-description">${itemInfo.description}</span>` : ''}
+    </div>
+    <div class="nutrient-value">${item.content} ${item.unit || ''}</div>
+    ${referenceHtml}
+  `;
+  
+  return element;
 }
 
 // ==================== 解析營養素名稱 ====================
